@@ -9,13 +9,10 @@
 #include "discretization_grid.h"
 
 void DiscretizationGrid::init(bool restart, VtiReader* vti_reader) {
-    int world_rank, world_size;
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
     MPI_Comm_size(MPI_COMM_WORLD, &world_size);
     std::cout << "World Size: " << world_size << "   Rank: " << world_rank << std::endl;
 
-    int cells[3];
-    double geomSize[3];
     double origin[3];
     int* materialAt_global = vti_reader->read_vti_material_data("17grains.vti", cells, geomSize, origin);
     if (world_rank != 0) {
@@ -31,21 +28,25 @@ void DiscretizationGrid::init(bool restart, VtiReader* vti_reader) {
     std::cout << "size:   " << geomSize[0] << " x " << geomSize[1] << " x " << geomSize[2] << " m³" << std::endl;
     std::cout << "origin: " << origin[0] << " " << origin[1] << " " << origin[2] << " m" << std::endl;
 
-    if (world_size > cells[2]) {
-        std::cerr << "number of processes exceeds cells[2]" << std::endl;
-    }
+    // if (world_size > cells[2]) {
+    //     std::cerr << "number of processes exceeds cells[2]" << std::endl;
+    // }
     fftw_mpi_init();
     ptrdiff_t z, z_offset;
-
     fftw_mpi_local_size_3d(cells[2], cells[1], cells[1]/2+1, MPI_COMM_WORLD, &z, &z_offset);
     if (z == 0) {
         std::cerr << "Cannot distribute MPI processes" << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    int cells2 = (int)z;
-    int cells2Offset = z_offset;
+
+    cells2 = (int)z;
+    cells2Offset = z_offset;
     int local_grid[3] = {cells[0], cells[1], cells2};
-    double local_size[3] = {geomSize[0], geomSize[1], geomSize[2] * cells2 / cells[2]};
+
+    size2 = geomSize[2] * cells2 / cells[2];
+    size2Offset = geomSize[2] * cells2Offset / cells[2];
+    double local_size[3] = {geomSize[0], geomSize[1], size2};
+
     int local_displacement = cells[0] * cells[1] * cells2Offset;
     int displacements[world_size];
     MPI_Gather(&local_displacement, 1, MPI_INT, displacements, 1, MPI_INT, 0, MPI_COMM_WORLD);
@@ -104,9 +105,6 @@ double* DiscretizationGrid::calculate_nodes0(int cells[3], double geomSize[3], i
                 n++;
             }
         }
-    }
-    for (int c = 0; c < 3*N; ++c) {
-        std::cout << nodes0[c] << ", ";
     }
     return nodes0;
 }

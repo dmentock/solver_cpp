@@ -9,6 +9,17 @@ extern "C" {
 
 class DiscretizationGrid {
 public:
+    int world_rank, world_size;
+
+    int cells[3];
+    int cells2;
+    int cells2Offset;
+
+    double geomSize[3];
+    double size2;
+    double size2Offset;
+
+
     virtual void f_discretization_init(int *materialAt, int *discretization_Nelems, double *IPcoords0, double *NodeCoords0, int *sharedNodesBegin) {
       return __discretization_MOD_discretization_init(materialAt, discretization_Nelems, IPcoords0, NodeCoords0, sharedNodesBegin);
     }
