@@ -17,18 +17,19 @@ find_path(MPI_INCLUDE_PATH mpi.h
           HINTS ${PETSC_ARCH_DIR}/include)
 find_library(MPI_C_LIBRARIES NAMES mpich PATHS "${PETSC_ARCH_DIR}/lib" NO_DEFAULT_PATH)
 find_library(MPI_CXX_LIBRARIES NAMES mpichcxx PATHS "${PETSC_ARCH_DIR}/lib" NO_DEFAULT_PATH)
+
+find_package(Eigen3 REQUIRED)
+find_package(VTK REQUIRED)
+# find_package(MPI REQUIRED)
+
 message(STATUS "MPI_C_COMPILER: ${MPI_C_COMPILER}")
 message(STATUS "MPI_CXX_COMPILER: ${MPI_CXX_COMPILER}")
 message(STATUS "MPIEXEC_EXECUTABLE: ${MPIEXEC_EXECUTABLE}")
-message(STATUS "MPI_INCLUDE_PATH: ${MPI_INCLUDE_PATH}")
-message(STATUS "MPI_LIBRARIES: ${MPI_LIBRARIES}")
+message(STATUS "inc: ${MPI_INCLUDE_PATH}")
+message(STATUS "lib: ${MPI_LIBRARIES}")
 
-
-find_package(VTK REQUIRED)
-find_package(Eigen3 REQUIRED)
-
-# set(FFTW_LIBRARIES "${PETSC_DIR}/lib/libfftw3_mpi.a" "${PETSC_DIR}/lib/libfftw3.a")
-
+set(PETSC_DIR "/usr/local/petsc")
+set(FFTW_LIBRARIES "${PETSC_ARCH_DIR}/lib/libfftw3_mpi.a" "${PETSC_ARCH_DIR}/lib/libfftw3.a")
 
 include_directories(${CMAKE_SOURCE_DIR}/include
                     ${MPI_INCLUDE_PATH}
