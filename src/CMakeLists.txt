@@ -1,5 +1,4 @@
 enable_language(Fortran)
-
 add_library(discretization SHARED discretization.f90)
 
 target_compile_options(discretization PUBLIC "-fvisibility=default")
@@ -18,9 +17,11 @@ target_link_libraries(discretization_grid
                       ${PETSC_DIR}/lib/libmpi.a
                       -lfftw3)
 
-add_library(grid_mech_spectral_basic spectral/mech/basic.cpp)
-target_link_libraries(grid_mech_spectral_basic 
+add_library(grid_spectral SHARED spectral/spectral.cpp)
+add_library(grid_spectral_mech_basic spectral/mech/basic.cpp)
+target_link_libraries(grid_spectral_mech_basic 
                     PUBLIC
+                    grid_spectral
                     ${PETSC_ARCH_DIR}/lib/libpetsc.so
                     ${MPI_C_LIBRARIES}
                     ${MPI_CXX_LIBRARIES})
