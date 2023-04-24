@@ -8,7 +8,7 @@
 
 #include "vti_reader.h"
 
-int* VtiReader::read_vti_material_data(const char* filename, int (&cells)[3], double (&geomSize)[3], double (&origin)[3]){
+int* VtiReader::read_vti_material_data(const char* filename, int (&cells)[3], double (&geom_size)[3], double (&origin)[3]){
   vtkSmartPointer<vtkXMLImageDataReader> reader =
     vtkSmartPointer<vtkXMLImageDataReader>::New();
   reader->SetFileName(filename);
@@ -17,9 +17,9 @@ int* VtiReader::read_vti_material_data(const char* filename, int (&cells)[3], do
   vtkSmartPointer<vtkCellData> cellData = imageData->GetCellData();
   vtkSmartPointer<vtkDataArray> dataArray = cellData->GetArray("material");
 
-  double geomSize_[6];
-  imageData->GetBounds(geomSize_);
-  for (int i = 0; i < 3; ++i) geomSize[i] = geomSize_[1+i*2];
+  double geom_size_[6];
+  imageData->GetBounds(geom_size_);
+  for (int i = 0; i < 3; ++i) geom_size[i] = geom_size_[1+i*2];
   double* origin_ = imageData->GetOrigin();
   for (int i = 0; i < 3; ++i) origin[i] = origin_[i];
   int* cells_;

@@ -43,34 +43,14 @@ public:
 };
 
 TEST_F(SpectralBasicSetup, TestInit) {
-  MockDiscretizedGrid grid;
-  MockSpectralBasic spectral_basic(grid);
+  MockDiscretization mock_discretization;
+  int cells_[] = {2, 3, 4};
+  double geom_size_[] = {2e-5, 3e-5, 4e-5};
+  MockDiscretizedGrid mock_grid(mock_discretization, &cells_[0], &geom_size_[0]);
+  MockSpectralBasic spectral_basic(mock_grid);
   spectral_basic.init();
 
 }
-
-//   MockDiscretizationGrid discretization_grid;
-//   // assert calculate_nodes0 and calculate_ipCoordinates0 are called with expected values
-//   EXPECT_CALL(discretization_grid, calculate_nodes0(
-//     ArrayPointee(3, testing::ElementsAreArray(cells)), 
-//     ArrayPointee(3, testing::ElementsAreArray(geom_size)), 
-//     testing::Eq(0))).WillOnce(testing::DoDefault());
-//   EXPECT_CALL(discretization_grid, calculate_ipCoordinates0(
-//     ArrayPointee(3, testing::ElementsAreArray(cells)), 
-//     ArrayPointee(3, testing::ElementsAreArray(geom_size)), 
-//     testing::Eq(0))).WillOnce(testing::DoDefault());
-  
-//   // assert discretization_grid fortran function is called with expected values
-//   std::vector<int> expected_grid(grid, grid + grid_size);
-//   EXPECT_CALL(discretization_grid, f_discretization_init(
-//     ArrayPointee(grid_size, testing::ElementsAreArray(expected_grid)), 
-//     testing::Pointee(24),
-//     testing::_, 
-//     testing::_, 
-//     testing::Pointee(48)))
-//     .WillOnce(testing::Return());
-//   discretization_grid.init(false, &mock_vti_reader);
-
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

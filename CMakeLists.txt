@@ -1,6 +1,5 @@
-cmake_minimum_required(VERSION 3.10)
-
 project(myproject)
+cmake_minimum_required(VERSION 3.10)
 
 set(CMAKE_CXX_STANDARD 11)
 
@@ -20,15 +19,14 @@ find_library(MPI_CXX_LIBRARIES NAMES mpichcxx PATHS "${PETSC_ARCH_DIR}/lib" NO_D
 
 find_package(Eigen3 REQUIRED)
 find_package(VTK REQUIRED)
-# find_package(MPI REQUIRED)
+# # possibly use FetchContent to make version control of modules easier
+# include(FetchContent)
+# FetchContent_Declare(
+#   googletest
+#   URL https://github.com/google/googletest/archive/refs/tags/release-1.11.0.tar.gz
+# )
+# FetchContent_MakeAvailable(googletest)
 
-message(STATUS "MPI_C_COMPILER: ${MPI_C_COMPILER}")
-message(STATUS "MPI_CXX_COMPILER: ${MPI_CXX_COMPILER}")
-message(STATUS "MPIEXEC_EXECUTABLE: ${MPIEXEC_EXECUTABLE}")
-message(STATUS "inc: ${MPI_INCLUDE_PATH}")
-message(STATUS "lib: ${MPI_LIBRARIES}")
-
-set(PETSC_DIR "/usr/local/petsc")
 set(FFTW_LIBRARIES "${PETSC_ARCH_DIR}/lib/libfftw3_mpi.a" "${PETSC_ARCH_DIR}/lib/libfftw3.a")
 
 include_directories(${CMAKE_SOURCE_DIR}/include
@@ -36,7 +34,6 @@ include_directories(${CMAKE_SOURCE_DIR}/include
                     ${PETSC_DIR}/include
                     ${PETSC_ARCH_DIR}/include
                     ${EIGEN3_INCLUDE_DIR})
-link_directories(${PETSC_ARCH_DIR}/lib)
 
 add_subdirectory(src)
-add_subdirectory(test)
+add_subdirectory(grid)

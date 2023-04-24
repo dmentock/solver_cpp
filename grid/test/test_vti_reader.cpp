@@ -45,18 +45,18 @@ class SetupVtiReadFromFile : public ::testing::Test {
 // test expected functionality of VtiReader.read_vti_material_data
 TEST_F(SetupVtiReadFromFile, VtiReadFromFile) {
     int cells[3];
-    double geomSize[3];
+    double geom_size[3];
     double origin[3];
     VtiReader vti_reader;
-    int* result_grid = vti_reader.read_vti_material_data(tmpFilePath.c_str(), cells, geomSize, origin);
+    int* result_grid = vti_reader.read_vti_material_data(tmpFilePath.c_str(), cells, geom_size, origin);
     int expected_grid[3][3][3] = {{{1, 10, 19}, {4, 13, 22}, {7, 16, 25}},
                                   {{2, 11, 20}, {5, 14, 23}, {8, 17, 26}},
                                   {{3, 12, 21}, {6, 15, 24}, {9, 18, 27}}};
     EXPECT_TRUE (std::equal(&expected_grid[0][0][0], &expected_grid[0][0][0] + 27, result_grid));
     int expected_cells[3] = {3, 3, 3};
     EXPECT_TRUE (std::equal(cells, cells + 3, expected_cells));
-    int expected_geomSize[3] = {1, 1, 1};
-    EXPECT_TRUE (std::equal(geomSize, geomSize + 3, expected_geomSize));
+    int expected_geom_size[3] = {1, 1, 1};
+    EXPECT_TRUE (std::equal(geom_size, geom_size + 3, expected_geom_size));
     int expected_origin[3] = {0, 0, 0};
     EXPECT_TRUE (std::equal(origin, origin + 3, expected_origin));
 }
