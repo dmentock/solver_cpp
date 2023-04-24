@@ -194,3 +194,126 @@ void Spectral::generate_plans(double* field_real_data,
                                                 PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_IN);
 }
 
+void Spectral::update_coords(Eigen::Tensor<double, 5> &F) {
+
+    Spectral::tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
+        Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2})).device(Eigen::DefaultDevice{}) = F;
+    Spectral::tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}),
+        Eigen::array<Eigen::Index, 5>({3, 3, cells0_reduced*2-grid.cells[0], grid.cells[1], grid.cells2})).setConstant(0);
+    fftw_mpi_execute_dft_r2c(plan_tensor_forth, tensorField_real->data(), tensorField_fourier_fftw);
+
+    // Average F
+    Eigen::Tensor<double, 2> Favg(3, 3);
+    if (cells1_offset_tensor == 0) {
+        auto sliced_tensor = tensorField_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
+                                                        Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1}));
+        Favg = sliced_tensor.real().reshape(Eigen::array<Eigen::Index, 2>({3, 3})) * Spectral::wgt;
+    }
+
+    // Integration in Fourier space to get fluctuations of cell center displacements
+    for (int j = 0; j < cells1_tensor ; ++j) {
+        for (int k = 0; k < grid.cells[2]; ++k) {
+            for (int i = 0; i < cells0_reduced ; ++i) {
+                std::array<int, 3> indices = {i, j + cells1_offset_tensor, k};
+                if (std::any_of(indices.begin(), indices.end(), [](int x) { return x != 0; })) {
+                    Eigen::Tensor<std::complex<double>, 2> tensor_slice = Spectral::tensorField_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, i, k, j}),
+                                            Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 2>({3, 3}));
+                    Eigen::Tensor<std::complex<double>, 1>  xi2_slice = xi2nd.slice(Eigen::array<Eigen::Index, 4>({0, i, k, j}),
+                        Eigen::array<Eigen::Index, 4>({3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 1>({3}));
+                    Eigen::array<Eigen::IndexPair<int>, 1> product_dims = {Eigen::IndexPair<int>(1, 0)};
+                    Eigen::Tensor<std::complex<double>, 1> result = tensor_slice.contract(xi2_slice, product_dims);
+                    Eigen::Array<std::complex<double>, 3, 1> xi2_array;
+                    for (Eigen::Index l = 0; l < 3; ++l)xi2_array(l) = -xi2_slice(l);
+                    std::complex<double> denominator = (xi2_array.conjugate() * xi2_array).sum();
+                    for (Eigen::Index l = 0; l < 3; ++l){
+                        (*Spectral::vectorField_fourier)(l,i,k,j) = result(l)/denominator;
+                    }
+                } else {
+                    Eigen::Tensor<std::complex<double>, 4> zero_tensor(3, 1, 1, 1);
+                    zero_tensor.setConstant(std::complex<double>(0.0, 0.0));
+                    Spectral::vectorField_fourier->slice(Eigen::array<Eigen::Index, 4>({0, i, k, j}),
+                                                         Eigen::array<Eigen::Index, 4>({3, 1, 1, 1})).device(Eigen::DefaultDevice{}) = zero_tensor;
+                }
+            }
+        }
+    }
+    fftw_mpi_execute_dft_c2r(Spectral::plan_vector_back, vectorField_fourier_fftw, vectorField_real->data());
+
+    Eigen::Tensor<double, 4>u_tilde_p_padded(3,grid.cells[0],grid.cells[1],grid.cells2+2);
+    u_tilde_p_padded.slice(Eigen::array<Eigen::Index, 4>({0, 0, 0, 1}),
+                           Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2})) = 
+    vectorField_real->slice(Eigen::array<Eigen::Index, 4>({0, 0, 0, 0}),
+                            Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2}))*Spectral::wgt;
+
+    // Pad cell center fluctuations along z-direction (needed when running MPI simulation)
+    int c = 3 * grid.cells[0] * grid.cells[1]; // amount of data to transfer
+    int rank_t = (grid.world_rank + 1) % grid.world_size;
+    int rank_b = (grid.world_rank - 1 + grid.world_size) % grid.world_size;
+    MPI_Request request[4];
+    MPI_Status status[4];
+    Eigen::array<Eigen::Index, 3> sub_dims = {3, grid.cells[0], grid.cells[1]};
+
+    // Send bottom layer to process below
+    Eigen::TensorMap<Eigen::Tensor<double, 3>> bottom_layer_send(u_tilde_p_padded.data() + 3 * grid.cells[0] * grid.cells[1], sub_dims);
+    MPI_Isend(bottom_layer_send.data(), c, MPI_DOUBLE, rank_b, 0, MPI_COMM_WORLD, &request[0]);
+    Eigen::TensorMap<Eigen::Tensor<double, 3>> top_layer_recv(u_tilde_p_padded.data() + 3 * grid.cells[0] * grid.cells[1] * (grid.cells2 + 1), sub_dims);
+    MPI_Irecv(top_layer_recv.data(), c, MPI_DOUBLE, rank_t, 0, MPI_COMM_WORLD, &request[1]);
+
+    // Send top layer to process above
+    Eigen::TensorMap<Eigen::Tensor<double, 3>> top_layer_send(u_tilde_p_padded.data() + 3 * grid.cells[0] * grid.cells[1] * grid.cells2, sub_dims);
+    MPI_Isend(top_layer_send.data(), c, MPI_DOUBLE, rank_t, 1, MPI_COMM_WORLD, &request[2]);
+    Eigen::TensorMap<Eigen::Tensor<double, 3>> bot_layer_recv(u_tilde_p_padded.data(), sub_dims);
+    MPI_Irecv(bot_layer_recv.data(), c, MPI_DOUBLE, rank_b, 1, MPI_COMM_WORLD, &request[3]);
+
+    MPI_Waitall(4, request, status);
+    if (std::any_of(status, status + 4, [](MPI_Status s) { return s.MPI_ERROR != 0; })) throw std::runtime_error("MPI error");
+
+    // Calculate cell center/point positions
+    int neighbor[8][3] = {
+        {0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0},
+        {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}
+    };
+    Eigen::array<Eigen::IndexPair<int>, 1> product_dims = {Eigen::IndexPair<int>(1, 0)};
+    Eigen::Array<double, 3, 1> step(grid.geom_size[0] / grid.cells[0], grid.geom_size[1] / grid.cells[1], grid.geom_size[2] / grid.cells[2]);
+    std::unique_ptr<Eigen::Tensor<double, 4>> x_n(new Eigen::Tensor<double, 4>(3, grid.cells[0] + 1, grid.cells[1] + 1, grid.cells2 + 1));
+    x_n->setZero();   
+    for (int j = 0; j <= grid.cells[1]; j++) {
+        for (int k = 0; k <= grid.cells2; k++) {
+            for (int i = 0; i <= grid.cells[0]; i++) {
+                std::array<double, 3> pos_data = {i * step[0], 
+                                                  j * step[1], 
+                                                  (k + grid.cells2_offset) * step[2]};
+                Eigen::TensorMap<Eigen::Tensor<double, 1>> pos_tensor(pos_data.data(), 3);
+                Eigen::Tensor<double, 1> result = Favg.contract(pos_tensor, product_dims);
+                for (int p = 0; p < 3; ++p) (*x_n)(p,i,j,k) = result(p);
+                for (int n = 0; n < 8; ++n) {
+                    int me[3] = {i+neighbor[n][0],j+neighbor[n][1],k+neighbor[n][2]};
+                    Eigen::Tensor<double, 1> ut_padded_slice = u_tilde_p_padded.chip(me[2], 3)
+                                                                               .chip(grid.modulo((me[1]-1), grid.cells[1]), 2)
+                                                                               .chip(grid.modulo((me[0]-1), grid.cells[0]), 1);
+                    for (int p = 0; p < 3; ++p) (*x_n)(p,i,j,k) += ut_padded_slice(p)* 0.125;
+                }
+            }
+        }
+    }
+
+    // Calculate cell center/point positions
+    std::unique_ptr<Eigen::Tensor<double, 4>> x_p(new Eigen::Tensor<double, 4>(3, grid.cells[0], grid.cells[1], grid.cells2));
+    for (int k = 0; k < grid.cells2; ++k) {
+        for (int j = 0; j < grid.cells[1]; ++j) {
+            for (int i = 0; i < grid.cells[0]; ++i) {
+                std::array<double, 3> pos_data = {(i + 0.5) * step[0], 
+                                                  (j + 0.5) * step[1], 
+                                                  (k + 0.5 + grid.cells2_offset)*step[2]};
+                Eigen::TensorMap<Eigen::Tensor<double, 1>> pos_tensor(pos_data.data(), 3);
+                Eigen::Tensor<double, 1> result = Favg.contract(pos_tensor, product_dims);
+                for (int p = 0; p < 3; ++p) (*x_p)(p, i, j, k) += result(p);
+            }
+        }
+    }
+    Eigen::Tensor<double, 2> reshaped_x_n = x_n->reshape(Eigen::array<Eigen::Index, 2>({3, (grid.cells[0] + 1) * (grid.cells[1] + 1) * (grid.cells2 + 1)}));
+    Spectral::grid.discretization_.set_node_coords(&reshaped_x_n);
+    Eigen::Tensor<double, 2> reshaped_x_p = x_p->reshape(Eigen::array<Eigen::Index, 2>({3, grid.cells[0] * grid.cells[1] * grid.cells2}));
+    Spectral::grid.discretization_.set_ip_coords(&reshaped_x_p);
+}
+
