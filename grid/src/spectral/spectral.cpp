@@ -145,3 +145,52 @@ void Spectral::init(){
     gamma_hat.setZero();
 }
 
+std::array<std::complex<double>, 3> Spectral::get_freq_derivative(int k_s[3]) {
+    std::array<std::complex<double>, 3> freq_derivative;
+    switch (spectral_derivative_ID) {
+        case DERIVATIVE_CONTINUOUS_ID:
+            for (int i = 0; i < 3; ++i) {
+                freq_derivative[i] = std::complex<double>(0.0, M_2_PI * k_s[i] / grid.geom_size[i]);
+            }
+            break;
+        case DERIVATIVE_CENTRAL_DIFF_ID:
+            for (int i = 0; i < 3; ++i) {
+                freq_derivative[i] = std::complex<double>(0.0, sin(M_2_PI * k_s[i] / grid.cells[i])) /
+                                     std::complex<double>(2.0 * grid.geom_size[i] / grid.cells[i], 0.0);
+            }
+            break;
+        case DERIVATIVE_FWBW_DIFF_ID:
+            for (int i = 0; i < 3; ++i) {
+                freq_derivative[i] = (std::complex<double>(cos(M_2_PI * k_s[i] / grid.cells[i]) - (i == 0 ? 1.0 : -1.0),
+                                                      sin(M_2_PI * k_s[i] / grid.cells[i])) *
+                                      std::complex<double>(cos(M_2_PI * k_s[(i + 1) % 3] / grid.cells[(i + 1) % 3]) + 1.0,
+                                                      sin(M_2_PI * k_s[(i + 1) % 3] / grid.cells[(i + 1) % 3])) *
+                                      std::complex<double>(cos(M_2_PI * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3]) + 1.0,
+                                                      sin(M_2_PI * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3])) /
+                                      std::complex<double>(4.0 * grid.geom_size[i] / grid.cells[i]), 0.0);
+            }
+            break;
+        default:
+            throw std::runtime_error("Invalid spectral_derivative_ID value.");
+    }
+    return freq_derivative;
+}
+
+void Spectral::generate_plans(double* field_real_data,
+                              std::complex<double>* field_fourier_data, 
+                              int size, ptrdiff_t cells_fftw_reversed[3], int fftw_planner_flag,
+                              fftw_plan &plan_forth, 
+                              fftw_plan &plan_back){
+    plan_forth = fftw_mpi_plan_many_dft_r2c(3, cells_fftw_reversed, size,
+                                                FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
+                                                field_real_data,
+                                                reinterpret_cast<fftw_complex*>(field_fourier_data),
+                                                PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_OUT);
+
+    plan_back = fftw_mpi_plan_many_dft_c2r(3, cells_fftw_reversed, size,
+                                                FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
+                                                reinterpret_cast<fftw_complex*>(field_fourier_data),
+                                                field_real_data,
+                                                PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_IN);
+}
+
