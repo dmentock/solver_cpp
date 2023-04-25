@@ -59,8 +59,8 @@ TEST_F(SpectralSetup, TestInit) {
 
 TEST_F(SpectralSetup, TestUpdateCoordsInit) {
   MockDiscretization mock_discretization;
-  int cells_[] = {2,1,1};
-  double geom_size_[] = {2e-5,1e-5,1e-5};
+  int cells_[] = {2, 1, 1};
+  double geom_size_[] = {2e-5, 1e-5, 1e-5};
   MockDiscretizedGrid mock_grid(mock_discretization, &cells_[0], &geom_size_[0]);
   PartialMockSpectral spectral(mock_grid);
 
@@ -115,7 +115,7 @@ TEST_F(SpectralSetup, TestUpdateCoordsInit) {
                   .setConstant(math_I3(i, j));
       }
     }
-  spectral.init(); // TODO: recreate only the required parts in test constructor
+  spectral.init(); // TODO: recreate only the required initializations in test constructor
   spectral.update_coords(F);
 }
 

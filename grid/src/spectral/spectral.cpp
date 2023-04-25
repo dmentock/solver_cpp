@@ -113,7 +113,6 @@ void Spectral::init(){
     for (int j = cells1_offset_tensor; j < cells1_offset_tensor + cells1_tensor; ++j) {
         k_s[1] = j;
         if (j > grid.cells[1] / 2) k_s[1] = k_s[1] - grid.cells[1];
-
         for (int k = 0; k < grid.cells[2]; ++k) {
             k_s[2] = k;
             if (k > grid.cells[2] / 2) k_s[2] = k_s[2] - grid.cells[2];
@@ -152,13 +151,11 @@ std::array<std::complex<double>, 3> Spectral::get_freq_derivative(int k_s[3]) {
             for (int i = 0; i < 3; ++i) {
                 freq_derivative[i] = std::complex<double>(0.0, M_2_PI * k_s[i] / grid.geom_size[i]);
             }
-            break;
         case DERIVATIVE_CENTRAL_DIFF_ID:
             for (int i = 0; i < 3; ++i) {
                 freq_derivative[i] = std::complex<double>(0.0, sin(M_2_PI * k_s[i] / grid.cells[i])) /
                                      std::complex<double>(2.0 * grid.geom_size[i] / grid.cells[i], 0.0);
             }
-            break;
         case DERIVATIVE_FWBW_DIFF_ID:
             for (int i = 0; i < 3; ++i) {
                 freq_derivative[i] = (std::complex<double>(cos(M_2_PI * k_s[i] / grid.cells[i]) - (i == 0 ? 1.0 : -1.0),
@@ -169,7 +166,6 @@ std::array<std::complex<double>, 3> Spectral::get_freq_derivative(int k_s[3]) {
                                                       sin(M_2_PI * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3])) /
                                       std::complex<double>(4.0 * grid.geom_size[i] / grid.cells[i]), 0.0);
             }
-            break;
         default:
             throw std::runtime_error("Invalid spectral_derivative_ID value.");
     }
@@ -223,11 +219,9 @@ void Spectral::update_coords(Eigen::Tensor<double, 5> &F) {
                     Eigen::array<Eigen::IndexPair<int>, 1> product_dims = {Eigen::IndexPair<int>(1, 0)};
                     Eigen::Tensor<std::complex<double>, 1> result = tensor_slice.contract(xi2_slice, product_dims);
                     Eigen::Array<std::complex<double>, 3, 1> xi2_array;
-                    for (Eigen::Index l = 0; l < 3; ++l)xi2_array(l) = -xi2_slice(l);
+                    for (Eigen::Index l = 0; l < 3; ++l) xi2_array(l) = -xi2_slice(l);
                     std::complex<double> denominator = (xi2_array.conjugate() * xi2_array).sum();
-                    for (Eigen::Index l = 0; l < 3; ++l){
-                        (*Spectral::vectorField_fourier)(l,i,k,j) = result(l)/denominator;
-                    }
+                    for (Eigen::Index l = 0; l < 3; ++l) (*Spectral::vectorField_fourier)(l,i,k,j) = result(l)/denominator;
                 } else {
                     Eigen::Tensor<std::complex<double>, 4> zero_tensor(3, 1, 1, 1);
                     zero_tensor.setConstant(std::complex<double>(0.0, 0.0));
@@ -239,7 +233,7 @@ void Spectral::update_coords(Eigen::Tensor<double, 5> &F) {
     }
     fftw_mpi_execute_dft_c2r(Spectral::plan_vector_back, vectorField_fourier_fftw, vectorField_real->data());
 
-    Eigen::Tensor<double, 4>u_tilde_p_padded(3,grid.cells[0],grid.cells[1],grid.cells2+2);
+    Eigen::Tensor<double, 4> u_tilde_p_padded(3,grid.cells[0],grid.cells[1],grid.cells2+2);
     u_tilde_p_padded.slice(Eigen::array<Eigen::Index, 4>({0, 0, 0, 1}),
                            Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2})) = 
     vectorField_real->slice(Eigen::array<Eigen::Index, 4>({0, 0, 0, 0}),
@@ -317,3 +311,56 @@ void Spectral::update_coords(Eigen::Tensor<double, 5> &F) {
     Spectral::grid.discretization_.set_ip_coords(&reshaped_x_p);
 }
 
+void Spectral::constitutive_response(Eigen::Tensor<double, 5> &P, 
+                                     Eigen::Tensor<double, 2> &P_av, 
+                                     Eigen::Tensor<double, 4> &C_volAvg, 
+                                     Eigen::Tensor<double, 4> &C_minMaxAvg,
+                                     Eigen::Tensor<double, 5> &F,
+                                     double Delta_t) {
+
+  // Reshape F
+//   std::cout << F.dimension(2);
+//   Eigen::Tensor<double, 3> homogenization_F;
+//   homogenization_F = F.reshape(Eigen::array<int, 3>({3, 3, grid.cells[0] * grid.cells[1] * grid.cells2}));
+
+  // Call the homogenization functions
+//   homogenization_mechanical_response(Delta_t, 1, product_cells[0] * product_cells[1]);
+//   if (!terminallyIll)
+//     homogenization_thermal_response(Delta_t, 1, product_cells[0] * product_cells[1]);
+//   if (!terminallyIll)
+//     homogenization_mechanical_response2(Delta_t, {1, 1}, {1, product_cells[0] * product_cells[1]});
+
+//   // Compute P and P_av
+//   Eigen::Tensor<double, 5> homogenization_P = /* ... */;
+//   P = homogenization_P.reshape(F.dimensions());
+//   P_av = (P.sum(Eigen::array<Eigen::Index, 1>({2})).sum(Eigen::array<Eigen::Index, 1>({3})).sum(Eigen::array<Eigen::Index, 1>({4})) * wgt).eval();
+
+//   // MPI Communication
+//   MPI_Allreduce(MPI_IN_PLACE, P_av.data(), 9, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD, &err_MPI);
+//   if (err_MPI != MPI_SUCCESS)
+//     throw std::runtime_error("MPI error");
+
+//   // Rotation of load frame
+//   if (rotation_BC.is_present()) {
+//     if (!rotation_BC.asQuaternion().isApprox(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0))) {
+//       std::cout << "Piola--Kirchhoff stress (lab) / MPa = " << P_av.transpose() * 1.e-6 << std::endl;
+//     }
+//     P_av = rotation_BC.rotate(P_av);
+//   }
+
+//   std::cout << "Piola--Kirchhoff stress       / MPa = " << P_av.transpose() * 1.e-6 << std::endl;
+
+//   // Find dPdF_min and dPdF_max
+//   // ...
+
+//   // Compute C_minMaxAvg
+//   C_minMaxAvg = 0.5 * (dPdF_max + dPdF_min);
+
+//   // Compute C_volAvg
+//   C_volAvg = homogenization_dPdF.sum(Eigen::array<Eigen::Index, 1>({4})) * wgt;
+
+//   // MPI Communication
+//   MPI_Allreduce(MPI_IN_PLACE, C_volAvg.data(), 81, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD)
+}
+void Spectral::update_gamma(Eigen::Tensor<double, 4> &C_minMaxAvg) {
+}
