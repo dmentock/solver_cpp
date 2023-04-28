@@ -2,6 +2,7 @@
 #include <mpi.h>
 #include <iostream>
 #include <unsupported/Eigen/CXX11/Tensor>
+#include <Eigen/Dense>
 
 #include <complex>
 #include <vector>
@@ -9,7 +10,6 @@
 #include <fftw3-mpi.h>
 #include <petsc.h>
 #include <stdexcept>
-#include <eigen_debug.h>
 #include <cmath>
 
 void Spectral::init(){
@@ -110,6 +110,7 @@ void Spectral::init(){
 
     int k_s[3];
     std::array<std::complex<double>, 3>  freq_derivative;
+    std::array<int, 3>  loop_indices;
     for (int j = cells1_offset_tensor; j < cells1_offset_tensor + cells1_tensor; ++j) {
         k_s[1] = j;
         if (j > grid.cells[1] / 2) k_s[1] = k_s[1] - grid.cells[1];
@@ -119,17 +120,17 @@ void Spectral::init(){
             for (int i = 0; i < cells0_reduced; ++i) {
                 k_s[0] = i;
                 freq_derivative = get_freq_derivative(k_s);
+                for (int p = 0; p < 3; ++p) xi2nd(p, i, k, j-cells1_offset_tensor) = freq_derivative[p];
+                std::cout << "get_freq_derivative" << k_s  << std::endl;
+                loop_indices = {i,j,k};
                 for (int p = 0; p < 3; ++p) {
-                    xi2nd(p, i, k, j-cells1_offset_tensor) = freq_derivative[p];
-                }
-                if (grid.cells[0] % 2 == 0 && grid.cells[1] % 2 == 0 && grid.cells[2] % 2 == 0 && 
-                    spectral_derivative_ID == DERIVATIVE_CONTINUOUS_ID) {
-                    for (int p = 0; p < 3; ++p) {
-                        xi1st(p, i, k, j-cells1_offset_tensor) = std::complex<double>(0.0, 0.0);
-                    }
-                } else {
-                    for (int p = 0; p < 3; ++p) {
-                        xi1st(p, i, k, j-cells1_offset_tensor) = xi2nd(p, i, k, j - cells1_offset_tensor);
+                    if (grid.cells[p] == loop_indices[p]+1){
+                        std::cout << "iffy"  << std::endl;
+                        xi1st(p, i, k, j - cells1_offset_tensor) = std::complex<double>(0.0, 0.0);
+                    } else {
+                        for (int p = 0; p < 3; ++p) {
+                            xi1st(p, i, k, j-cells1_offset_tensor) = xi2nd(p, i, k, j - cells1_offset_tensor);
+                        }
                     }
                 }
             }
@@ -140,7 +141,7 @@ void Spectral::init(){
     // } else {
     //     gamma_hat.resize(3, 3, 3, 3, cells1Red, cells[2], cells2);
     // }
-    gamma_hat.resize(3,3,3,cells0_reduced,grid.cells[2],cells1_tensor);
+    gamma_hat.resize(3,3,3,3,cells0_reduced,grid.cells[2],cells1_tensor);
     gamma_hat.setZero();
 }
 
@@ -149,23 +150,26 @@ std::array<std::complex<double>, 3> Spectral::get_freq_derivative(int k_s[3]) {
     switch (spectral_derivative_ID) {
         case DERIVATIVE_CONTINUOUS_ID:
             for (int i = 0; i < 3; ++i) {
-                freq_derivative[i] = std::complex<double>(0.0, M_2_PI * k_s[i] / grid.geom_size[i]);
+                freq_derivative[i] = std::complex<double>(0.0, TAU * k_s[i] / grid.geom_size[i]);
             }
+            break;
         case DERIVATIVE_CENTRAL_DIFF_ID:
             for (int i = 0; i < 3; ++i) {
-                freq_derivative[i] = std::complex<double>(0.0, sin(M_2_PI * k_s[i] / grid.cells[i])) /
+                freq_derivative[i] = std::complex<double>(0.0, sin(TAU * k_s[i] / grid.cells[i])) /
                                      std::complex<double>(2.0 * grid.geom_size[i] / grid.cells[i], 0.0);
             }
+            break;
         case DERIVATIVE_FWBW_DIFF_ID:
             for (int i = 0; i < 3; ++i) {
-                freq_derivative[i] = (std::complex<double>(cos(M_2_PI * k_s[i] / grid.cells[i]) - (i == 0 ? 1.0 : -1.0),
-                                                      sin(M_2_PI * k_s[i] / grid.cells[i])) *
-                                      std::complex<double>(cos(M_2_PI * k_s[(i + 1) % 3] / grid.cells[(i + 1) % 3]) + 1.0,
-                                                      sin(M_2_PI * k_s[(i + 1) % 3] / grid.cells[(i + 1) % 3])) *
-                                      std::complex<double>(cos(M_2_PI * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3]) + 1.0,
-                                                      sin(M_2_PI * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3])) /
+                freq_derivative[i] = (std::complex<double>(cos(TAU * k_s[i] / grid.cells[i]) - (i == 0 ? 1.0 : -1.0),
+                                                      sin(TAU * k_s[i] / grid.cells[i])) *
+                                      std::complex<double>(cos(TAU * k_s[(i + 1) % 3] / grid.cells[(i + 1) % 3]) + 1.0,
+                                                      sin(TAU * k_s[(i + 1) % 3] / grid.cells[(i + 1) % 3])) *
+                                      std::complex<double>(cos(TAU * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3]) + 1.0,
+                                                      sin(TAU * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3])) /
                                       std::complex<double>(4.0 * grid.geom_size[i] / grid.cells[i]), 0.0);
             }
+            break;
         default:
             throw std::runtime_error("Invalid spectral_derivative_ID value.");
     }
@@ -362,5 +366,53 @@ void Spectral::constitutive_response(Eigen::Tensor<double, 5> &P,
 //   // MPI Communication
 //   MPI_Allreduce(MPI_IN_PLACE, C_volAvg.data(), 81, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD)
 }
-void Spectral::update_gamma(Eigen::Tensor<double, 4> &C_minMaxAvg) {
+
+void Spectral::update_gamma(Eigen::Tensor<double, 4> &C) {
+    C_ref = C / wgt;
+    std::cout << "C " << std::endl;
+    gamma_hat.setConstant(std::complex<double>(0.0, 0.0));
+    for (int j = cells1_offset_tensor; j < cells1_offset_tensor + cells1_tensor; ++j) {
+        for (int k = 0; k < grid.cells[2]; ++k) {
+            for (int i = 0; i < cells0_reduced; ++i) {
+                if (i != 0 || j != 0 || k != 0) {
+                    Eigen::Matrix<std::complex<double>, 3, 3> xiDyad_cmplx;
+                    Eigen::Matrix<std::complex<double>, 3, 3> temp33_cmplx;
+                    for (int l = 0; l < 3; ++l) {
+                        for (int m = 0; m < 3; ++m) {
+                            xiDyad_cmplx(l, m) = std::conj(-xi1st(l, i, k, j - cells1_offset_tensor)) * xi1st(m, i, k, j - cells1_offset_tensor);
+                        }
+                    }
+                    for (int l = 0; l < 3; ++l) {
+                        for (int m = 0; m < 3; ++m) {
+                            temp33_cmplx(l, m) = 0; // use loops instead of contraction because of missing Tensor-Matrix interoperability in Eigen
+                            for (int n = 0; n < 3; ++n) {
+                                for (int o = 0; o < 3; ++o) {
+                                    temp33_cmplx(l, m) += std::complex<double>(C_ref(l, n, m, o), 0) * xiDyad_cmplx(n, o);
+                                }
+                            }
+                        }   
+                    }
+                    Eigen::Matrix<double, 6, 6> A;
+                    A.block<3, 3>(0, 0) = temp33_cmplx.real(); A.block<3, 3>(3, 3) = temp33_cmplx.real();
+                    A.block<3, 3>(0, 3) = temp33_cmplx.imag(); A.block<3, 3>(3, 0) = -temp33_cmplx.imag();
+                    if (std::abs(A.block<3, 3>(0, 0).determinant()) > 1e-16) {
+                        Eigen::Matrix<double, 6, 6> A_inv;
+                        A_inv = A.inverse();
+                        for (int i = 0; i < 3; ++i) {
+                            for (int j = 0; j < 3; ++j) {
+                                temp33_cmplx(i, j) = std::complex<double>(A_inv(i, j), A_inv(i + 3, j));
+                            }
+                        }
+                        for (int m = 0; m < 3; ++m) {
+                            for (int n = 0; n < 3; ++n) {
+                                for (int o = 0; o < 3; ++o) {
+                                    for (int l = 0; l < 3; ++l) gamma_hat(l, m, n, o, i, k, j - cells1_offset_tensor) = temp33_cmplx(l, n) * xiDyad_cmplx(o, m);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
