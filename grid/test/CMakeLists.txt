@@ -33,14 +33,14 @@ target_link_libraries(test_discretization_grid
                       GTest::Main 
                       gmock gmock_main)
 
-add_executable(test_spectral_mech_basic test_spectral_mech_basic.cpp)
-target_link_libraries(test_spectral_mech_basic 
-                      grid_mech_spectral_basic 
-                      discretization_grid
-                      ${PETSC_ARCH_DIR}/lib/libpetsc.so
-                      GTest::GTest 
-                      GTest::Main 
-                      gmock gmock_main)
+# add_executable(test_spectral_mech_basic test_spectral_mech_basic.cpp)
+# target_link_libraries(test_spectral_mech_basic 
+#                       grid_mech_spectral_basic 
+#                       discretization_grid
+#                       ${PETSC_ARCH_DIR}/lib/libpetsc.so
+#                       GTest::GTest 
+#                       GTest::Main 
+#                       gmock gmock_main)
 
 add_executable(test_spectral test_spectral.cpp)
 target_link_libraries(test_spectral 

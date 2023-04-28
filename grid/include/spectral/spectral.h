@@ -6,6 +6,7 @@
 #include <fftw3-mpi.h>
 #include <complex>
 #include <memory>
+#include <cmath>
  // here we will put all the utilities stuff
 struct tNumerics {
     bool update_gamma;
@@ -24,7 +25,7 @@ public:
                                 fftw_plan &plan_back);
     virtual std::array<std::complex<double>, 3> get_freq_derivative(int k_s[3]);
     virtual void update_coords(Eigen::Tensor<double, 5> &F);
-    virtual void update_gamma(Eigen::Tensor<double, 4> &C_minMaxAvg);
+    virtual void update_gamma(Eigen::Tensor<double, 4> &C);
     virtual void constitutive_response(Eigen::Tensor<double, 5> &P, 
                                Eigen::Tensor<double, 2> &P_av, 
                                Eigen::Tensor<double, 4> &C_volAvg, 
@@ -50,10 +51,13 @@ public:
     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 3>>> scalarField_fourier;
     Eigen::Tensor<std::complex<double>, 4> xi1st;
     Eigen::Tensor<std::complex<double>, 4> xi2nd;
-    Eigen::Tensor<std::complex<double>, 6> gamma_hat;
+    Eigen::Tensor<std::complex<double>, 7> gamma_hat;
+    Eigen::Tensor<double, 4> C_ref;
 protected:
     derivative_ids spectral_derivative_ID;
 private:
+    const double TAU = 2 * M_PI;
+
     fftw_complex* tensorField_fourier_fftw;
     fftw_complex* vectorField_fourier_fftw;
     fftw_complex* scalarField_fourier_fftw;
@@ -63,16 +67,12 @@ private:
     int cells1_offset_tensor;
     int cells0_reduced;
 
-
-
     fftw_plan plan_tensor_forth;
     fftw_plan plan_tensor_back;
     fftw_plan plan_vector_forth;
     fftw_plan plan_vector_back;
     fftw_plan plan_scalar_forth;
-    fftw_plan plan_scalar_back;
-
-    
+    fftw_plan plan_scalar_back;    
     
 protected:
     DiscretizationGrid& grid;

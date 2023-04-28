@@ -18,7 +18,6 @@ class SpectralBasicSetup : public ::testing::Test {
     PetscErrorCode ierr;
 
   void SetUp() override {
-    MockDiscretizedGrid grid;
     int argc = 0;
     char **argv = NULL;
     ierr = PetscInitialize(&argc, &argv, (char *)0,"PETSc help message.");

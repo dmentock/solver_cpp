@@ -67,6 +67,7 @@ int testfunc_direct(FortranFuncInterface* func_interface) {
   func_interface->fortran_interface_test_func(&testoutput);
   return testoutput;
 }
+class InterfaceTest : public ::testing::Test {};
 TEST_F(InterfaceTest, FortranFunctionSetsValues) {
   FortranFuncInterface func_interface;
   MockFortranFuncInterface mock_func_interface;

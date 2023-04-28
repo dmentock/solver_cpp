@@ -11,11 +11,18 @@ target_link_libraries(discretization_grid
                       ${MPI_C_LIBRARIES}
                       ${MPI_CXX_LIBRARIES}
                       ${VTK_LIBRARIES}
-                      ${PETSC_DIR}/lib/libfftw3_mpi.a
-                      ${PETSC_DIR}/lib/libmpi.a
+                      ${PETSC_ARCH_DIR}/lib/libfftw3_mpi.a
+                      ${PETSC_ARCH_DIR}/lib/libmpi.a
                       -lfftw3)
 
 add_library(grid_spectral SHARED spectral/spectral.cpp)
+target_link_libraries(grid_spectral 
+                    PUBLIC
+                    ${PETSC_ARCH_DIR}/lib/libpetsc.so
+                    ${PETSC_ARCH_DIR}/lib/libfftw3_mpi.a
+                    ${PETSC_ARCH_DIR}/lib/libmpi.a
+                    -lfftw3)
+
 add_library(grid_spectral_mech_basic spectral/mech/basic.cpp)
 target_link_libraries(grid_spectral_mech_basic 
                     PUBLIC
