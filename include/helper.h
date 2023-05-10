@@ -7,83 +7,14 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <iomanip> // Include this header for std::setw
 
-template <typename T, int N>
-Eigen::Tensor<T, N> generate_tensor(T* ndarray, Eigen::array<Eigen::Index, N> dims) {
-    Eigen::TensorMap<Eigen::Tensor<const T, N, Eigen::RowMajor>> tensor_map(ndarray, dims);
-    Eigen::Tensor<T, N> tensor(tensor_map.dimensions());
-    tensor = tensor_map.reshape(dims).swap_layout();
-    return tensor;
-}
-
-template <typename T, int N>
-Eigen::Tensor<T, N> array_to_eigen_tensor(const T* data, const Eigen::array<Eigen::Index, N>& dims) {
-    Eigen::Tensor<T, N> col_major_tensor(dims);
-    Eigen::array<Eigen::Index, N> row_major_strides;
-    Eigen::array<Eigen::Index, N> col_major_strides;
-    // Compute row-major strides
-    row_major_strides[N - 1] = 1;
-    for (int i = N - 2; i >= 0; --i) row_major_strides[i] = row_major_strides[i + 1] * dims[i + 1];
-    // Compute column-major strides
-    col_major_strides[0] = 1;
-    for (int i = 1; i < N; ++i) col_major_strides[i] = col_major_strides[i - 1] * dims[i - 1];
-    Eigen::array<Eigen::Index, N> index;
-    for (Eigen::Index i = 0; i < col_major_tensor.size(); ++i) {
-        Eigen::Index row_major_offset = 0;
-        Eigen::Index col_major_offset = 0;
-        for (int d = 0; d < N; ++d) {
-            index[d] = (i / col_major_strides[d]) % dims[d];
-            row_major_offset += index[d] * row_major_strides[d];
-            col_major_offset += index[d] * col_major_strides[d];
-        }
-        col_major_tensor.data()[col_major_offset] = data[row_major_offset];
-    }
-    return col_major_tensor;
-}
-
-template <typename T, int N>
-bool tensor_eq(const Eigen::Tensor<T, N>& tensor1, const Eigen::Tensor<T, N>& tensor2, double epsilon = 1e-8) {
-    assert(tensor1.dimensions() == tensor2.dimensions());
-    bool mismatch_found = false;
-    for (Eigen::Index i = 0; i < tensor1.size(); ++i) {
-        if (std::abs(tensor1.data()[i] - tensor2.data()[i]) > epsilon) {
-            if (!mismatch_found) {
-                std::cout << "Mismatch found between tensors:" << std::endl;
-                mismatch_found = true;
-            }
-            Eigen::array<Eigen::Index, N> index;
-            Eigen::Index idx = i;
-            for (int d = 0; d < N; ++d) {
-                index[d] = idx % tensor1.dimension(d);
-                idx /= tensor1.dimension(d);
-            }
-
-            std::cout << "At index (";
-            for (int d = 0; d < N; ++d) {
-                std::cout << index[d];
-                if (d < N - 1) {
-                    std::cout << ", ";
-                }
-            }
-            std::cout << std::setprecision(10) << "): Tensor 1 = " << tensor1.data()[i] << ", Tensor 2 = " << tensor2.data()[i] << std::endl;
-        }
-    }
-
-    if (!mismatch_found) {
-        return true;
-    } else {
-        return false;
-    }
-}
-
-
 //recursively print out tensor values
 template <typename T, int N>
-void print_tensor(const Eigen::Tensor<T, N>& tensor, std::vector<size_t>& indices, size_t level, const std::string& indent, int maxWidth) {
+void print(const Eigen::Tensor<T, N>& tensor, std::vector<size_t>& indices, size_t level, const std::string& indent, int maxWidth, bool compressed = false) {
   if (level == N - 1) {
     std::cout << indent << "{\n";
     for (int i = 0; i < tensor.dimension(level); ++i) {
       indices[level] = i;
-      std::cout << std::setprecision(10) << indent << std::setw(maxWidth) << tensor(indices);
+      std::cout << std::setprecision(17) << indent << std::setw(maxWidth) << tensor(indices);
       if (i < tensor.dimension(level) - 1) {
         std::cout << ",";
       }
@@ -93,7 +24,7 @@ void print_tensor(const Eigen::Tensor<T, N>& tensor, std::vector<size_t>& indice
     std::cout << indent << "{\n";
     for (int i = 0; i < tensor.dimension(level); ++i) {
       indices[level] = i;
-      print_tensor(tensor, indices, level + 1, indent + " ", maxWidth);
+      print(tensor, indices, level + 1, indent + " ", maxWidth);
       if (i < tensor.dimension(level) - 1) {
         std::cout << ",";
       }
@@ -113,11 +44,106 @@ int get_max_width(const Eigen::Tensor<T, N>& tensor) {
   return maxWidth;
 }
 template <typename T, int N>
-void print_tensor(const Eigen::Tensor<T, N>* tensor) {
+void print(const std::string& label, const Eigen::Tensor<T, N>& tensor) {
+  std::cout << std::endl << "printing tensor " << label << ", dims (";
+  for (int i = 0; i < tensor.dimensions().size(); ++i) {
+    std::cout << tensor.dimensions()[i];
+    if (i < tensor.dimensions().size() - 1) {
+        std::cout << ", ";
+    }
+  }
+  std::cout << ")" << std::endl;
   std::vector<size_t> indices(N, 0);
-  int maxWidth = get_max_width(*tensor);
-  print_tensor(*tensor, indices, 0, "", maxWidth); // Pass the maxWidth as an argument
+  int maxWidth = get_max_width(tensor);
+  print(tensor, indices, 0, "", maxWidth); // Pass the maxWidth as an argument
+  std::cout << std::endl;
 }
 
+template <typename T, int N>
+void print_map(const std::string& label, const Eigen::TensorMap<Eigen::Tensor<T, N>>& tensor_map) {
+  Eigen::Tensor<T, N> tensor = tensor_map;
+  print(label, &tensor);
+}
+
+template <typename TensorType>
+void cat_print_recursive(const TensorType* tensor, const std::vector<int>& indices, int current_index) {
+    if (current_index == indices.size()) {
+        std::cout << std::setprecision(17) <<  tensor->coeff(indices) << std::endl;
+        return;
+    }
+
+    for (int i = 0; i < tensor->dimension(current_index); ++i) {
+        std::vector<int> new_indices = indices;
+        new_indices[current_index] = i;
+        cat_print_recursive(tensor, new_indices, current_index + 1);
+    }
+}
+
+template <typename TensorType>
+void cat_print(const TensorType* tensor, const std::string& label = "") {
+    std::cout << std::endl << "cat-printing tensor " << label << ", dims (";
+    for (int i = 0; i < tensor->dimensions().size(); ++i) {
+        std::cout << tensor->dimensions()[i];
+        if (i < tensor->dimensions().size() - 1) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << ")" << std::endl;
+    std::vector<int> indices(tensor->dimensions().size(), 0);
+    cat_print_recursive(tensor, indices, 0);
+}
+
+
+template <typename T, int Rank>
+void print_f(const std::string& label, const Eigen::Tensor<T, Rank>& tensor) {
+    std::cout << std::endl << "fortranstyle-printing tensor " << label << ", dims (";
+    for (int i = 0; i < tensor.dimensions().size(); ++i) {
+        std::cout << tensor.dimensions()[i];
+        if (i < tensor.dimensions().size() - 1) {
+            std::cout << ", ";
+        }
+    }
+    std::cout << ")" << std::endl;
+    std::array<int, Rank> index{};
+    int total_elements = tensor.size();
+    for (int linear_idx = 0; linear_idx < total_elements; ++linear_idx) {
+        int remainder = linear_idx;
+        for (int r = 0; r < Rank; ++r) {
+            index[r] = remainder % tensor.dimension(r);
+            remainder /= tensor.dimension(r);
+        }
+        std::cout << "Element ("; 
+        for (int r = 0; r < Rank; ++r) {
+            std::cout << index[r] + 1;  // Use 1-based indices like Fortran
+            if (r < Rank - 1) std::cout << ", ";
+        }
+        std::cout << std::setprecision(17) << "): " << tensor.coeff(linear_idx) << std::endl;
+    }
+}
+
+template <typename T, int N>
+void print_f_map(const std::string& label, const Eigen::TensorMap<Eigen::Tensor<T, N>>& tensor_map) {
+  Eigen::Tensor<T, N> tensor = tensor_map;
+  print_f(label, tensor);
+}
+
+template <typename T, int N>
+void print_f_mat(const std::string& label, Eigen::Matrix<T, N, N>& mat){
+    Eigen::TensorMap<Eigen::Tensor<T, 2>> tensor_map(mat.data(), N, N);
+    print_f_map(label, tensor_map);
+}
+
+// template <typename T>
+// void print_f_matx(const std::string& label, const Eigen::Matrix<T, Eigen::Dynamic, Eigen::Dynamic>& mat) {
+//     Eigen::Tensor<T, 2>::Dimensions dims(mat.rows(), mat.cols());
+//     Eigen::TensorMap<const Eigen::Tensor<T, 2>> tensor_map(mat.data(), dims);
+//     print_f_map(label, tensor_map);
+// }
+template <typename T, int N>
+Eigen::Tensor<T, 2> mat_to_tensor(Eigen::Matrix<T, N, N> mat){
+    Eigen::TensorMap<Eigen::Tensor<T, 2>> tensor_map(mat.data(), N, N);
+    Eigen::Tensor<T, 2> tensor = tensor_map;
+    return tensor;
+}
 
 #endif // HELPER_H
