@@ -220,22 +220,22 @@ void Spectral::update_coords(Eigen::Tensor<double, 5> &F) {
     Spectral::tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
         Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2})).device(Eigen::DefaultDevice{}) = F;
     Spectral::tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}),
-        Eigen::array<Eigen::Index, 5>({3, 3, cells0_reduced*2-grid.cells[0], grid.cells[1], grid.cells2})).setConstant(0);
+        Eigen::array<Eigen::Index, 5>({3, 3, grid.cells0_reduced*2-grid.cells[0], grid.cells[1], grid.cells2})).setConstant(0);
     fftw_mpi_execute_dft_r2c(plan_tensor_forth, tensorField_real->data(), tensorField_fourier_fftw);
 
     // Average F
     Eigen::Tensor<double, 2> Favg(3, 3);
-    if (cells1_offset_tensor == 0) {
+    if (grid.cells1_offset_tensor == 0) {
         auto sliced_tensor = tensorField_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
                                                         Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1}));
-        Favg = sliced_tensor.real().reshape(Eigen::array<Eigen::Index, 2>({3, 3})) * Spectral::wgt;
+        Favg = sliced_tensor.real().reshape(Eigen::array<Eigen::Index, 2>({3, 3})) * wgt;
     }
 
     // Integration in Fourier space to get fluctuations of cell center displacements
-    for (int j = 0; j < cells1_tensor ; ++j) {
+    for (int j = 0; j < grid.cells1_tensor ; ++j) {
         for (int k = 0; k < grid.cells[2]; ++k) {
-            for (int i = 0; i < cells0_reduced ; ++i) {
-                std::array<int, 3> indices = {i, j + cells1_offset_tensor, k};
+            for (int i = 0; i < grid.cells0_reduced ; ++i) {
+                std::array<int, 3> indices = {i, j + grid.cells1_offset_tensor, k};
                 if (std::any_of(indices.begin(), indices.end(), [](int x) { return x != 0; })) {
                     Eigen::Tensor<std::complex<double>, 2> tensor_slice = Spectral::tensorField_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, i, k, j}),
                                             Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 2>({3, 3}));

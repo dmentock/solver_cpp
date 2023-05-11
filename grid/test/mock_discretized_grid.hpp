@@ -19,11 +19,13 @@ class MockDiscretizedGrid : public DiscretizationGrid {
       world_rank = 0;
       world_size = 1;
       cells[0] = cells_[0]; cells[1] = cells_[1]; cells[2] = cells_[2];
+      scaled_geom_size[0] = cells_[0]; scaled_geom_size[1] = cells_[1]; scaled_geom_size[2] = cells_[2];
       cells2 = cells[2];
       cells2_offset = 0;  
       geom_size[0] = geom_size_[0]; geom_size[1] = geom_size_[1]; geom_size[2] = geom_size_[2];
       size2 = geom_size[2] * cells2 / cells[2];
       size2Offset = geom_size[2] * cells2_offset / cells[2];
+      cells0_reduced = cells[0] / 2 + 1;
     }  
     MOCK_METHOD(double*, calculate_nodes0, (int[3], double[3], int), (override));
     MOCK_METHOD(double*, calculate_ipCoordinates0, (int[3], double[3], int), (override));

@@ -15,8 +15,13 @@ public:
     int cells2_offset;
 
     double geom_size[3];
+    double scaled_geom_size[3];
     double size2;
     double size2Offset;
+
+    int cells0_reduced;
+    int cells1_tensor;
+    int cells1_offset_tensor;
 
     void init(bool restart, VtiReader* vti_reader);
     virtual double* calculate_nodes0(int cells[3], double geom_size[3], int cells2_offset);
