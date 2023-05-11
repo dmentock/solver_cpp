@@ -466,4 +466,61 @@ void Spectral::forward_field(double delta_t,
     }
 }
 
+void Spectral::calculate_masked_compliance( Eigen::Tensor<double, 4> &C,
+                                            std::array<double, 4> &rot_bc_q,
+                                            const Eigen::Matrix<bool, 3, 3> &mask_stress,
+                                            Eigen::Tensor<double, 4> &masked_compliance) {
+
+  std::array<bool, 9> mask_stress_vector;
+  for (int col = 0; col < mask_stress.cols(); ++col) {
+    for (int row = 0; row < mask_stress.rows(); ++row) {
+      mask_stress_vector[col * mask_stress.rows() + row] = !mask_stress(row, col);
+    }
+  }
+  int size_reduced = std::count(mask_stress_vector.begin(), mask_stress_vector.end(), true);
+
+  Eigen::Matrix<double, 9, 9> temp99_real;
+  if (size_reduced > 0) {
+    Eigen::Tensor<double, 4> rotated;
+    rotated.resize(3, 3, 3, 3);
+    f_rotate_tensor4(rot_bc_q.data(), C.data(), rotated.data());
+    f_math_3333to99(rotated.data(), temp99_real.data());
+    Eigen::Matrix<bool, 9, 9> mask;
+    for (int i = 0; i < 9; ++i) {
+      for (int j = 0; j < 9; ++j) {
+        mask(i, j) = mask_stress_vector[i] && mask_stress_vector[j];
+      }
+    }
+    Eigen::MatrixXd c_reduced(size_reduced, size_reduced);
+    Eigen::MatrixXd s_reduced(size_reduced, size_reduced);
+    int idx = 0;
+    for (int i = 0; i < 9; ++i) {
+      for (int j = 0; j < 9; ++j) {
+        if (mask(i, j)) {
+          c_reduced(idx / size_reduced, idx % size_reduced) = temp99_real(i, j);
+          ++idx;    
+        }
+      }
+    }
+    int errmatinv = 0;
+    f_math_invert(s_reduced.data(), &errmatinv, c_reduced.data(), &size_reduced);
+    if (errmatinv) {
+      std::cerr << "Matrix inversion error: " << std::endl;
+      std::cerr << c_reduced << std::endl;
+      exit(1);
+    }
+    temp99_real.setZero();
+    idx = 0;
+    for (int i = 0; i < 9; ++i) {
+      for (int j = 0; j < 9; ++j) {
+        if (mask(i, j)) {
+          temp99_real(i, j) = s_reduced(idx / size_reduced, idx % size_reduced);
+          ++idx;
+        }
+      }
+    }
+  } else {
+    temp99_real.setZero();
+  }
+  f_math_99to3333(temp99_real.data(), masked_compliance.data());
 }

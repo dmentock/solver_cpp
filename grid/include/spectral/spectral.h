@@ -44,6 +44,10 @@ public:
                                 Eigen::Tensor<double, 5> &rate, 
                                 Eigen::Tensor<double, 5> &forwarded_field,
                                 Eigen::Matrix<double, 3, 3>* aim = nullptr);
+    virtual void calculate_masked_compliance(Eigen::Tensor<double, 4> &C,
+                                            std::array<double, 4> &rot_bc_q,
+                                            const Eigen::Matrix<bool, 3, 3> &mask_stress,
+                                            Eigen::Tensor<double, 4> &masked_compliance);
     void response_mech();
     void response_thermal();
     void response_damage();
