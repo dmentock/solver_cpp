@@ -64,34 +64,34 @@ public:
     double wgt;
     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 5>>> tensorField_real;
     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 5>>> tensorField_fourier;
+    fftw_complex* tensorField_fourier_fftw;
+    fftw_plan plan_tensor_forth;
+    fftw_plan plan_tensor_back;
     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 4>>> vectorField_real;
     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 4>>> vectorField_fourier;
+    fftw_complex* vectorField_fourier_fftw;
+    fftw_plan plan_vector_forth;
+    fftw_plan plan_vector_back;
     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 3>>> scalarField_real;
     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 3>>> scalarField_fourier;
+    fftw_complex* scalarField_fourier_fftw;
+    fftw_plan plan_scalar_forth;
+    fftw_plan plan_scalar_back;
     Eigen::Tensor<std::complex<double>, 4> xi1st;
     Eigen::Tensor<std::complex<double>, 4> xi2nd;
     Eigen::Tensor<std::complex<double>, 7> gamma_hat;
     Eigen::Tensor<double, 4> C_ref;
+
 protected:
     derivative_ids spectral_derivative_ID;
+    int tensor_size = 9;
+    int vector_size = 3;
+    int scalar_size = 1;
+
 private:
     const double TAU = 2 * M_PI;
 
-    fftw_complex* tensorField_fourier_fftw;
-    fftw_complex* vectorField_fourier_fftw;
-    fftw_complex* scalarField_fourier_fftw;
-    int tensor_size = 9;
-    int vector_size = 3;
-    int cells1_tensor;
-    int cells1_offset_tensor;
-    int cells0_reduced;
 
-    fftw_plan plan_tensor_forth;
-    fftw_plan plan_tensor_back;
-    fftw_plan plan_vector_forth;
-    fftw_plan plan_vector_back;
-    fftw_plan plan_scalar_forth;
-    fftw_plan plan_scalar_back;    
     
 protected:
     DiscretizationGrid& grid;
