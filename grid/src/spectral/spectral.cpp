@@ -28,8 +28,8 @@ void Spectral::init(){
     std::cout << "https://doi.org/10.1007/978-981-10-6855-3_80" << std::endl;
 
     //get num_grid 167-224
-    cells0_reduced = grid.cells[0] / 2 + 1;
-    Spectral::wgt = std::pow(grid.cells[0] * grid.cells[1] * grid.cells[2], -1);
+  grid.cells0_reduced = grid.cells[0] / 2 + 1;
+  wgt = std::pow(grid.cells[0] * grid.cells[1] * grid.cells[2], -1);
     //get num vairables 177-210
     spectral_derivative_ID = DERIVATIVE_CONTINUOUS_ID;
     double scaled_geom_size[3] = {grid.geom_size[0], grid.geom_size[1], grid.geom_size[2]};
@@ -37,99 +37,59 @@ void Spectral::init(){
     //  call fftw_set_timelimit(num_grid%get_asFloat('fftw_timelimit',defaultVal=300.0_pReal)) 229
     fftw_set_timelimit(300.0);
     std::cout << "\n FFTW initialized" << std::endl;
-    int cells_fftw[3] = {grid.cells[0], grid.cells[1], grid.cells[2]};
-    ptrdiff_t fftw_dims[3] = {cells_fftw[2], cells_fftw[1], cells0_reduced};
-    ptrdiff_t cells2_fftw, cells2_offset, cells1_fftw, cells1_offset, N;
 
-    N = fftw_mpi_local_size_many_transposed(3, fftw_dims, Spectral::tensor_size, 
-                                            FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
-                                            PETSC_COMM_WORLD, 
-                                            &cells2_fftw, &cells2_offset, 
-                                            &cells1_fftw, &cells1_offset);
-    cells1_tensor = cells1_fftw;
-    cells1_offset_tensor = cells1_offset;
-    if (cells2_fftw != grid.cells2)
-        throw std::runtime_error("domain decomposition mismatch (tensor, real space)");
-    tensorField_fourier_fftw = fftw_alloc_complex(N);
-    tensorField_real.reset(new Eigen::TensorMap<Eigen::Tensor<double, 5>>(reinterpret_cast<double*>(tensorField_fourier_fftw), 
-                                                                      {3,3,cells0_reduced*2, cells_fftw[1], cells2_fftw}));
-    tensorField_fourier.reset(new Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 5>>(reinterpret_cast<std::complex<double>*>(tensorField_fourier_fftw), 
-                                                                      {3,3,cells0_reduced, cells_fftw[2], cells1_fftw}));
+  std::array<ptrdiff_t, 3> cells_fftw = {grid.cells[0], grid.cells[1], grid.cells[2]};
 
-    N = fftw_mpi_local_size_many_transposed(3, fftw_dims, Spectral::vector_size,
-                                            FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
-                                            PETSC_COMM_WORLD, 
-                                            &cells2_fftw, &cells2_offset, 
-                                            &cells1_fftw, &cells1_offset);
-    if (cells2_fftw != grid.cells2)
-        throw std::runtime_error("domain decomposition mismatch (vector, real space)");
-    if (cells1_fftw != cells1_tensor)
-        throw std::runtime_error("domain decomposition mismatch (vector, Fourier space)");
-    vectorField_fourier_fftw = fftw_alloc_complex(N);
-    vectorField_real.reset(new Eigen::TensorMap<Eigen::Tensor<double, 4>>(reinterpret_cast<double*>(vectorField_fourier_fftw), 
-                                                                      {3,cells0_reduced*2, cells_fftw[1], cells2_fftw}));
-    vectorField_fourier.reset(new Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 4>>(reinterpret_cast<std::complex<double>*>(vectorField_fourier_fftw),
-                                                                      {3,cells0_reduced, cells_fftw[2], cells1_fftw}));
+  ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
 
-    N = fftw_mpi_local_size_many_transposed(3, fftw_dims, 1, //fftw_mpi_local_size_3d_transposed generates free(): invalid pointer or arithmetic error -> using many_transposed instead
-                                            FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
-                                            PETSC_COMM_WORLD, 
-                                            &cells2_fftw, &cells2_offset, 
-                                            &cells1_fftw, &cells1_offset);
-    if (cells2_fftw != grid.cells2)
-        throw std::runtime_error("domain decomposition mismatch (vector, real space)");
-    if (cells1_fftw != cells1_tensor)
-        throw std::runtime_error("domain decomposition mismatch (vector, Fourier space)");
-    scalarField_fourier_fftw = fftw_alloc_complex(N);
-    scalarField_real.reset(new Eigen::TensorMap<Eigen::Tensor<double, 3>>(reinterpret_cast<double*>(scalarField_fourier_fftw), 
-                                                                      {cells0_reduced*2, cells_fftw[1], cells2_fftw}));
-    scalarField_fourier.reset(new Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 3>>(reinterpret_cast<std::complex<double>*>(scalarField_fourier_fftw),
-                                                                      {cells0_reduced, cells_fftw[2], cells1_fftw}));
+  // call tensor func
+  set_up_fftw(cells1_fftw, cells1_offset, 
+              cells2_fftw,
+              tensor_size, 
+              tensorField_real, tensorField_fourier, tensorField_fourier_fftw,
+              fftw_planner_flag, plan_tensor_forth, plan_tensor_back,
+              "tensor");
+  grid.cells1_tensor = cells1_fftw;
+  grid.cells1_offset_tensor = cells1_offset;
 
-    xi1st.resize(3, cells0_reduced, grid.cells[2], cells1_tensor);
+  set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, vector_size, 
+              vectorField_real, vectorField_fourier, vectorField_fourier_fftw,
+              fftw_planner_flag, plan_vector_forth, plan_vector_back,
+              "vector");
+
+  set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, scalar_size, 
+              scalarField_real, scalarField_fourier, scalarField_fourier_fftw,
+              fftw_planner_flag, plan_scalar_forth, plan_scalar_back,
+              "scalar");
+
+  // std::cout << "hhe 3 " << grid.cells0_reduced << " " << grid.cells[2] << " " <<  grid.cells1_tensor << std::endl;
+  // exit(0);
+  xi1st.resize(3, grid.cells0_reduced, grid.cells[2], grid.cells1_tensor);
     xi1st.setConstant(std::complex<double>(0,0));
-    xi2nd.resize(3, cells0_reduced, grid.cells[2], cells1_tensor);
+  xi2nd.resize(3, grid.cells0_reduced, grid.cells[2], grid.cells1_tensor);
     xi2nd.setConstant(std::complex<double>(0,0));
 
-    ptrdiff_t cells_fftw_reversed[3] = {cells_fftw[2], cells_fftw[1], cells_fftw[0]};
-
-    Spectral::generate_plans(tensorField_real->data(), tensorField_fourier->data(), tensor_size, cells_fftw_reversed,
-                             fftw_planner_flag, plan_tensor_forth, plan_tensor_back);
-    if (!plan_tensor_forth) throw std::runtime_error("FFTW error r2c tensor");
-    if (!plan_tensor_back) throw std::runtime_error("FFTW error c2r tensor");
-
-    Spectral::generate_plans(vectorField_real->data(), vectorField_fourier->data(), vector_size, cells_fftw_reversed,
-                             fftw_planner_flag, plan_vector_forth, plan_vector_back);
-    if (!plan_vector_forth) throw std::runtime_error("FFTW error r2c vector");
-    if (!plan_vector_back) throw std::runtime_error("FFTW error c2r vector");
-
-    Spectral::generate_plans(scalarField_real->data(), scalarField_fourier->data(), 1, cells_fftw_reversed,
-                             fftw_planner_flag, plan_scalar_forth, plan_scalar_back);
-    if (!plan_scalar_forth) throw std::runtime_error("FFTW error r2c scalar");
-    if (!plan_scalar_back) throw std::runtime_error("FFTW error c2r scalar");
-
-    int k_s[3];
-    std::array<std::complex<double>, 3>  freq_derivative;
+  std::array<int, 3> k_s;
+  std::array<std::complex<double>, 3> freq_derivative;
+  // use lambda function for get_freq_derivative
     std::array<int, 3>  loop_indices;
-    for (int j = cells1_offset_tensor; j < cells1_offset_tensor + cells1_tensor; ++j) {
+  for (int j = grid.cells1_offset_tensor; j < grid.cells1_offset_tensor + grid.cells1_tensor; ++j) {
         k_s[1] = j;
         if (j > grid.cells[1] / 2) k_s[1] = k_s[1] - grid.cells[1];
         for (int k = 0; k < grid.cells[2]; ++k) {
             k_s[2] = k;
             if (k > grid.cells[2] / 2) k_s[2] = k_s[2] - grid.cells[2];
-            for (int i = 0; i < cells0_reduced; ++i) {
+      for (int i = 0; i < grid.cells0_reduced; ++i) {
                 k_s[0] = i;
                 freq_derivative = get_freq_derivative(k_s);
-                for (int p = 0; p < 3; ++p) xi2nd(p, i, k, j-cells1_offset_tensor) = freq_derivative[p];
-                std::cout << "get_freq_derivative" << k_s  << std::endl;
+        for (int p = 0; p < 3; ++p) xi2nd(p, i, k, j-grid.cells1_offset_tensor) = freq_derivative[p];
                 loop_indices = {i,j,k};
                 for (int p = 0; p < 3; ++p) {
                     if (grid.cells[p] == loop_indices[p]+1){
-                        std::cout << "iffy"  << std::endl;
-                        xi1st(p, i, k, j - cells1_offset_tensor) = std::complex<double>(0.0, 0.0);
+            xi1st(p, i, k, j - grid.cells1_offset_tensor) = std::complex<double>(0.0, 0.0);
                     } else {
                         for (int p = 0; p < 3; ++p) {
-                            xi1st(p, i, k, j-cells1_offset_tensor) = xi2nd(p, i, k, j - cells1_offset_tensor);
+              xi1st(p, i, k, j-grid.cells1_offset_tensor) = xi2nd(p, i, k, j - grid.cells1_offset_tensor);
                         }
                     }
                 }
@@ -141,11 +101,72 @@ void Spectral::init(){
     // } else {
     //     gamma_hat.resize(3, 3, 3, 3, cells1Red, cells[2], cells2);
     // }
-    gamma_hat.resize(3,3,3,3,cells0_reduced,grid.cells[2],cells1_tensor);
+  gamma_hat.resize(3,3,3,3,grid.cells0_reduced,grid.cells[2],grid.cells1_tensor);
     gamma_hat.setZero();
 }
 
-std::array<std::complex<double>, 3> Spectral::get_freq_derivative(int k_s[3]) {
+template <int Rank>
+void Spectral::set_up_fftw (ptrdiff_t& cells1_fftw, 
+                            ptrdiff_t& cells1_offset, 
+                            ptrdiff_t& cells2_fftw,
+                            int size,
+                            std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>>& field_real,
+                            std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>>& field_fourier,
+                            fftw_complex*& field_fourier_fftw,
+                            int fftw_planner_flag,
+                            fftw_plan& plan_forth, 
+                            fftw_plan& plan_back,
+                            const std::string& label){
+    ptrdiff_t N, cells2_offset;
+    ptrdiff_t fftw_dims[3] = {grid.cells[2], grid.cells[1], grid.cells0_reduced};
+    N = fftw_mpi_local_size_many_transposed(3, fftw_dims, size, 
+                                            FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
+                                            PETSC_COMM_WORLD, 
+                                            &cells2_fftw, &cells2_offset, 
+                                            &cells1_fftw, &cells1_offset);
+    field_fourier_fftw = fftw_alloc_complex(N);
+    
+    auto create_dimensions = [](const std::initializer_list<ptrdiff_t>& init_list) {
+      Eigen::array<ptrdiff_t, Rank> arr;
+      std::copy(init_list.begin(), init_list.end(), arr.begin());
+      return arr;
+    };
+    Eigen::array<ptrdiff_t, Rank> dims_real;
+    Eigen::array<ptrdiff_t, Rank> dims_fourier;
+    if (label == "tensor") {
+      dims_real = create_dimensions({3, 3, grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
+      dims_fourier = create_dimensions({3, 3, grid.cells0_reduced, grid.cells[2], cells1_fftw});
+    } else {
+       if (cells1_fftw != grid.cells1_tensor) throw std::runtime_error("domain decomposition mismatch ("+ label +", Fourier space)");
+       if (label == "vector") {
+         dims_real = create_dimensions({3, grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
+         dims_fourier = create_dimensions({3, grid.cells0_reduced, grid.cells[2], cells1_fftw});
+       } else if (label == "scalar") {
+         dims_real = create_dimensions({grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
+         dims_fourier = create_dimensions({grid.cells0_reduced, grid.cells[2], cells1_fftw});
+       } else {
+           throw std::runtime_error("Invalid label");
+       }
+    } 
+    field_real.reset(new Eigen::TensorMap<Eigen::Tensor<double, Rank>>(reinterpret_cast<double*>(field_fourier_fftw), dims_real));
+    field_fourier.reset(new Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>(reinterpret_cast<std::complex<double>*>(field_fourier_fftw), dims_fourier));
+    ptrdiff_t cells_reversed[3] = {grid.cells[2], grid.cells[1], grid.cells[0]};              
+    plan_forth = fftw_mpi_plan_many_dft_r2c(3, cells_reversed, size,
+                                               FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
+                                               field_real->data(),
+                                               reinterpret_cast<fftw_complex*>(field_fourier->data()),
+                                               PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_OUT);
+
+    plan_back = fftw_mpi_plan_many_dft_c2r(3, cells_reversed, size,
+                                              FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
+                                              reinterpret_cast<fftw_complex*>(field_fourier->data()),
+                                              field_real->data(),
+                                              PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_IN);
+    if (!plan_tensor_forth) throw std::runtime_error("FFTW error r2c " + label);
+    if (!plan_tensor_back) throw std::runtime_error("FFTW error c2r " + label);
+}
+
+std::array<std::complex<double>, 3> Spectral::get_freq_derivative(std::array<int, 3>& k_s) {
     std::array<std::complex<double>, 3> freq_derivative;
     switch (spectral_derivative_ID) {
         case DERIVATIVE_CONTINUOUS_ID:

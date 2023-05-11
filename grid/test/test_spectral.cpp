@@ -8,19 +8,29 @@
 #include <mpi.h>
 #include <petscsys.h>
 #include <petsc.h>
+#include <fftw3-mpi.h>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <Eigen/Core>
 
 #include "mock_discretized_grid.hpp"
 #include "spectral/spectral.h"
+#include "tensor_operations.h"
+#include "test/complex_concatenator.h"
 #include "helper.h"
 
-class MPIEnvironment : public ::testing::Environment {
+class PetscMpiEnv : public ::testing::Environment {
+protected:
+  PetscErrorCode ierr;
 public:
     virtual void SetUp() {
         int argc = 0;
         char **argv = NULL;
-        MPI_Init(&argc, &argv);
+    ierr = PetscInitialize(&argc, &argv, (char *)0,"PETSc help message.");
+    ASSERT_EQ(ierr, 0) << "Error initializing PETSc.";
+  }
+  virtual void TearDown() override {
+    ierr = PetscFinalize();
+    ASSERT_EQ(ierr, 0) << "Error finalizing PETSc.";
     }
 };
 
@@ -39,31 +49,64 @@ class SpectralSetup : public ::testing::Test {
   }
 };
 
-class PartialMockSpectral : public Spectral {
+class MinimalGridSetup : public ::testing::Test {
+protected:
+  std::unique_ptr<MockDiscretizedGrid> mock_grid;
 public:
-    PartialMockSpectral(DiscretizationGrid& grid_) : Spectral(grid_) {}
-    MOCK_METHOD((std::array<std::complex<double>, 3>), get_freq_derivative, (int*), (override));
+  void SetUp() {
+    MockDiscretization mock_discretization;
+    int cells_[] = {2, 1, 1};
+    double geom_size_[] = {2e-5, 1e-5, 1e-5};
+    mock_grid.reset(new MockDiscretizedGrid(mock_discretization, &cells_[0], &geom_size_[0]));
+  }
+  void init_tensorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid){
+    ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
+    spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
+                       spectral.tensorField_real, spectral.tensorField_fourier, spectral.tensorField_fourier_fftw,
+                       FFTW_MEASURE, spectral.plan_tensor_forth, spectral.plan_tensor_back,
+                       "tensor");
+    mock_grid.cells1_tensor = cells1_fftw;
+    mock_grid.cells1_offset_tensor = cells1_offset;
+  }
+  void init_vectorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid){
+    ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
+    spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
+                       spectral.vectorField_real, spectral.vectorField_fourier, spectral.vectorField_fourier_fftw,
+                       FFTW_MEASURE, spectral.plan_vector_forth, spectral.plan_vector_back,
+                       "vector");
+  }
 };
+TEST_F(MinimalGridSetup,SpectralTestInit) {
+  Spectral spectral(*mock_grid);
 
-// TEST_F(SpectralSetup, TestInit) {
-//   MockDiscretization mock_discretization;
-//   int cells_[] = {2, 3, 4};
-//   double geom_size_[] = {2e-5, 3e-5, 4e-5};
-//   MockDiscretizedGrid mock_grid(mock_discretization, &cells_[0], &geom_size_[0]);
-//   PartialMockSpectral spectral(mock_grid);
+  Eigen::Tensor<std::complex<double>, 4> expected_xi1st(3, 2, 1, 1);
+  expected_xi1st.setValues({
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}},
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}},
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}}
+  });
 
-//   std::array<std::complex<double>, 3> res;
-//   for (int i = 0; i < 3; ++i) res[i] = std::complex<double>(1,0);
-//   EXPECT_CALL(spectral, get_freq_derivative(testing::_))
-//     .WillRepeatedly(testing::DoAll(testing::Return(res)));
+  Eigen::Tensor<std::complex<double>, 4> expected_xi2nd;
+  expected_xi2nd.resize(3, 2, 1, 1);
+  expected_xi2nd.setValues({
+   {{{ c( 0               ,  0               ) }},
+    {{ c( 0               ,  314159.2653589793) }}},
+   {{{ c( 0               ,  0               ) }},
+    {{ c( 0               ,  0               ) }}},
+   {{{ c( 0               ,  0               ) }},
+    {{ c( 0               ,  0               ) }}}
+  });
 
-//   spectral.init();
-//   Eigen::DSizes<Eigen::DenseIndex, 4> expected_xi_dims(3, 2, 4, 3);
-//   ASSERT_EQ(spectral.xi1st.dimensions(), expected_xi_dims);
-//   ASSERT_EQ(spectral.xi2nd.dimensions(), expected_xi_dims);
-//   Eigen::DSizes<Eigen::DenseIndex, 6> expected_gamma_hat_dims(3, 3, 3, 2, 4, 3);
-//   ASSERT_EQ(spectral.gamma_hat.dimensions(), expected_gamma_hat_dims);
-// }
+  spectral.init();
+  EXPECT_TRUE(tensor_eq(spectral.xi1st, expected_xi1st));
+  EXPECT_TRUE(tensor_eq(spectral.xi2nd, expected_xi2nd));
+
+  Eigen::DSizes<Eigen::DenseIndex, 7> expected_gamma_hat_dims(3, 3, 3, 3, 2, 1, 1);
+  ASSERT_EQ(spectral.gamma_hat.dimensions(), expected_gamma_hat_dims);
+}
 
 // TEST_F(SpectralSetup, TestUpdateCoordsInit) {
 //   MockDiscretization mock_discretization;

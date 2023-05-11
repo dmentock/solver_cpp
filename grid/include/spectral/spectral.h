@@ -18,13 +18,20 @@ class Spectral {
 public:
     Spectral(DiscretizationGrid& grid_) : grid(grid_) {}
     virtual void init();
-    void generate_plans(double* field_real_data,
-                                std::complex<double>* field_fourier_data, 
-                                int size, ptrdiff_t cells_fftw_reversed[3], int fftw_planner_flag,
+    template <int Rank>
+    void set_up_fftw(ptrdiff_t& cells1_fftw, 
+                     ptrdiff_t& cells1_offset, 
+                     ptrdiff_t& cells2_fftw,
+                     int size,
+                     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>>& field_real,
+                     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>>& field_fourier,
+                     fftw_complex*& field_fourier_fftw,
+                     int fftw_planner_flag,
                                 fftw_plan &plan_forth, 
-                                fftw_plan &plan_back);
-    virtual std::array<std::complex<double>, 3> get_freq_derivative(int k_s[3]);
-    virtual void update_coords(Eigen::Tensor<double, 5> &F);
+                     fftw_plan &plan_back,
+                     const std::string& label);
+    virtual std::array<std::complex<double>, 3> get_freq_derivative(std::array<int, 3>& k_s);
+    virtual void update_coords(Eigen::Tensor<double, 5> &F, Eigen::Tensor<double, 2>& reshaped_x_n, Eigen::Tensor<double, 2>& reshaped_x_p);
     virtual void update_gamma(Eigen::Tensor<double, 4> &C);
     virtual void constitutive_response(Eigen::Tensor<double, 5> &P, 
                                Eigen::Tensor<double, 2> &P_av, 
