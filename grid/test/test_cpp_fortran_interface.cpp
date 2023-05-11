@@ -7,7 +7,7 @@
 #include <cstdlib>
 #include <math.h>
 
-#include <array_matcher.h>
+#include <test/array_matcher.h>
 
 extern "C" {
 void __fortran_testmodule_MOD_fortran_datatypes_test(

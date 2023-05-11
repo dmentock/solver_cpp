@@ -14,6 +14,7 @@
 
 #include "mock_discretized_grid.hpp"
 #include "spectral/spectral.h"
+#include "test/array_matcher.h"
 #include "tensor_operations.h"
 #include "test/complex_concatenator.h"
 #include "helper.h"

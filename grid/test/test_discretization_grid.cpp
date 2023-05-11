@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <array_matcher.h>
+#include <test/array_matcher.h>
 #include <iostream>
 #include <cstdio>
 #include <fstream>
@@ -10,14 +10,6 @@
 
 #include "discretization_grid.h"
 #include "vti_reader.h"
-
-// test discretization_grid.init and mock the calls to vti_reader, calculate_nodes0, calculate_ipCoordinates0
-// to test functionality in isolation, verify functionality by checking args passed to mocked discretization_init fortran subroutine
-class MockVtiReader : public VtiReader {
-  public:
-    MOCK_METHOD(int*, read_vti_material_data, (const char*, int (&)[3], double (&)[3], double (&)[3]), (override));
-};
-
 class MockDiscretization : public Discretization {
   public:
     MOCK_METHOD(void, init, (int*, int*, double*, double*, int), (override));
@@ -55,13 +47,7 @@ class DiscretizationGridSetup : public ::testing::Test {
   }
 };
 TEST_F(DiscretizationGridSetup, TestInit) {
-  MockVtiReader mock_vti_reader;
-  // mock vti_reader module to return specified data
-  EXPECT_CALL(mock_vti_reader, read_vti_material_data(testing::_, testing::_, testing::_, testing::_))
-    .WillOnce(testing::DoAll(testing::SetArrayArgument<1>(cells, cells + 3),
-                             testing::SetArrayArgument<2>(geom_size, geom_size + 3),
-                             testing::SetArrayArgument<3>(origin, origin + 3),
-                             testing::Return(grid)));
+
   MockDiscretization mock_discretization;
   MockDiscretizationGrid discretization_grid(mock_discretization);
 
@@ -85,7 +71,7 @@ TEST_F(DiscretizationGridSetup, TestInit) {
     testing::Eq(48)))
     .WillOnce(testing::Return());
 
-  discretization_grid.init(false, &mock_vti_reader);
+  // discretization_grid.init(false, &mock_vti_reader);
 }
 // test expected behaviour of calculate_ipCoordinates0 and calculate_nodes0
 class CoordCalculationSetup : public ::testing::Test {

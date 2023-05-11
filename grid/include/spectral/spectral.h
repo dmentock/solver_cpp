@@ -7,7 +7,12 @@
 #include <complex>
 #include <memory>
 #include <cmath>
- // here we will put all the utilities stuff
+extern "C" {
+    void f_math_invert(double *InvA, int *err, double *A, int *n);
+    void f_rotate_tensor4(double *qu, double *T, double *rotated);
+    void f_math_3333to99(double* m3333, double* m99);
+    void f_math_99to3333(double* m99, double* m3333);
+}
 struct tNumerics {
     bool update_gamma;
     int itmin, itmax;
@@ -43,6 +48,13 @@ public:
     void response_thermal();
     void response_damage();
 
+    template <int Rank>
+    void math_invert(Eigen::Matrix<double, Rank, Rank>& InvA, 
+                     Eigen::Matrix<double, Rank, Rank>& A) {
+        int err = 0;
+        int rank_value = Rank;
+        f_math_invert(InvA.data(), &err, A.data(), &rank_value);
+    }
     enum derivative_ids { 
         DERIVATIVE_CONTINUOUS_ID,
         DERIVATIVE_CENTRAL_DIFF_ID,

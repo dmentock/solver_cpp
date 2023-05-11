@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <array_matcher.h>
+#include <test/array_matcher.h>
 #include <iostream>
 #include <cstdio>
 #include <fstream>
