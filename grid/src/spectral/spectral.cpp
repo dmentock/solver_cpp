@@ -423,12 +423,47 @@ void Spectral::update_gamma(Eigen::Tensor<double, 4> &C) {
   }
 }
 
-                                }
-                            }
+void Spectral::forward_field(double delta_t, 
+                            Eigen::Tensor<double, 5> &field_last_inc, 
+                            Eigen::Tensor<double, 5> &rate, 
+                            Eigen::Tensor<double, 5> &forwarded_field,
+                            Eigen::Matrix<double, 3, 3>* aim) {
+
+    forwarded_field = field_last_inc + rate*delta_t;
+    if (aim != nullptr){
+        Eigen::array<int, 3> reduce_dims = {2, 3, 4};
+        Eigen::Matrix<double, 3, 3> field_diff;
+        field_diff.setZero();
+        double sum;
+        for (int i = 0; i < 3; ++i) {
+            for (int j = 0; j < 3; ++j) {
+                sum = 0;
+
+                for (int k = 0; k < grid.cells[0]; ++k) {
+                    for (int l = 0; l < grid.cells[1]; ++l) {
+                        for (int m = 0; m < grid.cells2; ++m) {
+                             sum += forwarded_field(i, j, k, l, m);
+                        }
+                    }
+                }
+                field_diff(i, j) = sum * wgt;
+            }
+        }
+        int count = field_diff.size();
+        MPI_Allreduce(MPI_IN_PLACE, field_diff.data(), count, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+        field_diff = field_diff - *aim;  
+        for (int i = 0; i < grid.cells[0]; ++i) {
+            for (int j = 0; j < grid.cells[1]; ++j) {
+                for (int k = 0; k < grid.cells2; ++k) {
+                    for (int m = 0; m < 3; ++m) {
+                        for (int n = 0; n < 3; ++n) {
+                            forwarded_field(m, n, i, j, k) -= field_diff(m, n);
                         }
                     }
                 }
             }
         }
     }
+}
+
 }

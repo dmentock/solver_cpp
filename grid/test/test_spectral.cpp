@@ -243,6 +243,46 @@ TEST_F(MinimalGridSetup, TestUpdateGamma) {
   // TODO: add mpi test with initialized instead of mocked discretization
   // TODO: find testcases that cause gamma fluctuation
 }
+
+TEST_F(MinimalGridSetup, SpectralTestForwardField) {
+  Spectral spectral(*mock_grid);
+  spectral.wgt = 0.5;
+
+  Eigen::Tensor<double, 5> field_last_inc(3, 3, 2, 1, 1);
+  field_last_inc.setValues({
+   {{{{  1  }}, {{  1  }}}, {{{  0  }}, {{  0  }}}, {{{  0  }}, {{  0  }}}},
+   {{{{  0  }}, {{  0  }}}, {{{  1  }}, {{  1  }}}, {{{  0  }}, {{  0  }}}},
+   {{{{  0  }}, {{  0  }}}, {{{  0  }}, {{  0  }}}, {{{  1  }}, {{  1  }}}}
+  });
+
+  Eigen::Tensor<double, 5> rate(3, 3, 2, 1, 1);
+  rate.setValues({
+   {{{{  0.001 }}, {{  0.001 }}}, {{{  0    }}, {{  0    }}}, {{{  0    }}, {{  0    }}}},
+   {{{{  0     }}, {{  0     }}}, {{{  0    }}, {{  0    }}}, {{{  0    }}, {{  0    }}}},
+   {{{{  0     }}, {{  0     }}}, {{{  0    }}, {{  0    }}}, {{{  0    }}, {{  0    }}}}
+  });
+
+  Eigen::Matrix<double, 3, 3> aim;
+  aim.resize(3,3);
+  aim << 1.001,  0   ,  0,
+         0    ,  1   ,  0,
+         0    ,  0   ,  1;
+
+  double delta_t = 1;
+
+  Eigen::Tensor<double, 5> expected_forwarded_field(3, 3, 2, 1, 1);
+  expected_forwarded_field.setValues({
+   {{{{  1.001 }}, {{  1.001 }}}, {{{  0    }}, {{  0    }}}, {{{  0    }}, {{  0    }}}},
+   {{{{  0     }}, {{  0     }}}, {{{  1    }}, {{  1    }}}, {{{  0    }}, {{  0    }}}},
+   {{{{  0     }}, {{  0     }}}, {{{  0    }}, {{  0    }}}, {{{  1    }}, {{  1    }}}}
+  });
+
+  Eigen::Tensor<double, 5> forwarded_field;
+  forwarded_field.resize(3, 3, 2, 1, 1);
+  spectral.forward_field(delta_t, field_last_inc, rate, forwarded_field, &aim);
+  EXPECT_TRUE(tensor_eq(forwarded_field, expected_forwarded_field));
+}
+
 //   MockDiscretization mock_discretization;
 //   int cells_[] = {2, 1, 1};
 //   double geom_size_[] = {2e-5, 1e-5, 1e-5};

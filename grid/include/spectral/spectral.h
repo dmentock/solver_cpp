@@ -32,18 +32,18 @@ public:
                      std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>>& field_fourier,
                      fftw_complex*& field_fourier_fftw,
                      int fftw_planner_flag,
-                                fftw_plan &plan_forth, 
+                     fftw_plan &plan_forth, 
                      fftw_plan &plan_back,
                      const std::string& label);
     virtual std::array<std::complex<double>, 3> get_freq_derivative(std::array<int, 3>& k_s);
     virtual void update_coords(Eigen::Tensor<double, 5> &F, Eigen::Tensor<double, 2>& reshaped_x_n, Eigen::Tensor<double, 2>& reshaped_x_p);
     virtual void update_gamma(Eigen::Tensor<double, 4> &C);
     virtual void constitutive_response(Eigen::Tensor<double, 5> &P, 
-                               Eigen::Tensor<double, 2> &P_av, 
-                               Eigen::Tensor<double, 4> &C_volAvg, 
-                               Eigen::Tensor<double, 4> &C_minMaxAvg,
-                               Eigen::Tensor<double, 5> &F,
-                               double Delta_t);
+    virtual void forward_field(double delta_t, 
+                                Eigen::Tensor<double, 5> &field_last_inc, 
+                                Eigen::Tensor<double, 5> &rate, 
+                                Eigen::Tensor<double, 5> &forwarded_field,
+                                Eigen::Matrix<double, 3, 3>* aim = nullptr);
     void response_mech();
     void response_thermal();
     void response_damage();
