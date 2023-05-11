@@ -19,16 +19,9 @@ target_link_libraries(test_cpp_fortran_interface
                       GTest::Main
                       gmock gmock_main)
 
-add_executable(test_vti_reader test_vti_reader.cpp)
-target_link_libraries(test_vti_reader 
-                      vti_reader 
-                      GTest::GTest 
-                      GTest::Main)
-
 add_executable(test_discretization_grid test_discretization_grid.cpp)
 target_link_libraries(test_discretization_grid 
                       discretization_grid 
-                      vti_reader 
                       GTest::GTest 
                       GTest::Main 
                       gmock gmock_main)
@@ -45,7 +38,7 @@ target_link_libraries(test_discretization_grid
 add_executable(test_spectral test_spectral.cpp)
 target_link_libraries(test_spectral 
                     ${PETSC_ARCH_DIR}/lib/libpetsc.so
-                    grid_spectral
+                    spectral
                     discretization_grid
                     GTest::GTest 
                     GTest::Main 
