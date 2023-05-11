@@ -371,45 +371,58 @@ void Spectral::constitutive_response(Eigen::Tensor<double, 5> &P,
 }
 
 void Spectral::update_gamma(Eigen::Tensor<double, 4> &C) {
-    C_ref = C / wgt;
-    std::cout << "C " << std::endl;
-    gamma_hat.setConstant(std::complex<double>(0.0, 0.0));
-    for (int j = cells1_offset_tensor; j < cells1_offset_tensor + cells1_tensor; ++j) {
-        for (int k = 0; k < grid.cells[2]; ++k) {
-            for (int i = 0; i < cells0_reduced; ++i) {
-                if (i != 0 || j != 0 || k != 0) {
-                    Eigen::Matrix<std::complex<double>, 3, 3> xiDyad_cmplx;
-                    Eigen::Matrix<std::complex<double>, 3, 3> temp33_cmplx;
-                    for (int l = 0; l < 3; ++l) {
-                        for (int m = 0; m < 3; ++m) {
-                            xiDyad_cmplx(l, m) = std::conj(-xi1st(l, i, k, j - cells1_offset_tensor)) * xi1st(m, i, k, j - cells1_offset_tensor);
-                        }
-                    }
-                    for (int l = 0; l < 3; ++l) {
-                        for (int m = 0; m < 3; ++m) {
-                            temp33_cmplx(l, m) = 0; // use loops instead of contraction because of missing Tensor-Matrix interoperability in Eigen
-                            for (int n = 0; n < 3; ++n) {
-                                for (int o = 0; o < 3; ++o) {
-                                    temp33_cmplx(l, m) += std::complex<double>(C_ref(l, n, m, o), 0) * xiDyad_cmplx(n, o);
-                                }
-                            }
-                        }   
-                    }
-                    Eigen::Matrix<double, 6, 6> A;
-                    A.block<3, 3>(0, 0) = temp33_cmplx.real(); A.block<3, 3>(3, 3) = temp33_cmplx.real();
-                    A.block<3, 3>(0, 3) = temp33_cmplx.imag(); A.block<3, 3>(3, 0) = -temp33_cmplx.imag();
-                    if (std::abs(A.block<3, 3>(0, 0).determinant()) > 1e-16) {
-                        Eigen::Matrix<double, 6, 6> A_inv;
-                        A_inv = A.inverse();
-                        for (int i = 0; i < 3; ++i) {
-                            for (int j = 0; j < 3; ++j) {
-                                temp33_cmplx(i, j) = std::complex<double>(A_inv(i, j), A_inv(i + 3, j));
-                            }
-                        }
-                        for (int m = 0; m < 3; ++m) {
-                            for (int n = 0; n < 3; ++n) {
-                                for (int o = 0; o < 3; ++o) {
-                                    for (int l = 0; l < 3; ++l) gamma_hat(l, m, n, o, i, k, j - cells1_offset_tensor) = temp33_cmplx(l, n) * xiDyad_cmplx(o, m);
+  C_ref = C / wgt;
+  gamma_hat.setConstant(std::complex<double>(0.0, 0.0));
+  for (int j = grid.cells1_offset_tensor; j < grid.cells1_offset_tensor + grid.cells1_tensor; ++j) {
+    for (int k = 0; k < grid.cells[2]; ++k) {
+      for (int i = 0; i < grid.cells0_reduced; ++i) {
+        if (i != 0 || j != 0 || k != 0) {
+          Eigen::Matrix<std::complex<double>, 3, 3> xiDyad_cmplx;
+          Eigen::TensorMap<Eigen::Tensor<const std::complex<double>, 2>> xiDyad_cmplx_map(xiDyad_cmplx.data(), 3, 3);
+          Eigen::Matrix<std::complex<double>, 3, 3> temp33_cmplx;
+          for (int l = 0; l < 3; ++l) {
+              for (int m = 0; m < 3; ++m) {
+                xiDyad_cmplx(l, m) = std::conj(-xi1st(l, i, k, j - grid.cells1_offset_tensor)) * xi1st(m, i, k, j - grid.cells1_offset_tensor);
+              }
+          }
+          for (int l = 0; l < 3; ++l) {
+              for (int m = 0; m < 3; ++m) {
+                  temp33_cmplx(l, m) = 0; // use loops instead of contraction because of missing Tensor-Matrix interoperability in Eigen
+                  for (int n = 0; n < 3; ++n) {
+                      for (int o = 0; o < 3; ++o) {
+                          temp33_cmplx(l, m) += std::complex<double>(C_ref(l, n, m, o), 0) * xiDyad_cmplx(n, o);
+                      }
+                  }
+              }   
+          }
+          Eigen::Matrix<double, 6, 6> A;
+          A.block<3, 3>(0, 0) = temp33_cmplx.real(); 
+          A.block<3, 3>(3, 3) = temp33_cmplx.real();
+          A.block<3, 3>(0, 3) = temp33_cmplx.imag(); 
+          A.block<3, 3>(3, 0) = -temp33_cmplx.imag();
+          if (std::abs(A.block<3, 3>(0, 0).determinant()) > 1e-16) {
+            Eigen::Matrix<double, 6, 6> A_inv;
+            A_inv = A.inverse();
+            for (int i = 0; i < 3; ++i) {
+              for (int j = 0; j < 3; ++j) {
+                temp33_cmplx(i, j) = std::complex<double>(A_inv(i, j), A_inv(i + 3, j));
+              }
+            }
+            for (int m = 0; m < 3; ++m) {
+              for (int n = 0; n < 3; ++n) {
+                  for (int o = 0; o < 3; ++o) {
+              for (int l = 0; l < 3; ++l) 
+                gamma_hat(l, m, n, o, i, k, j - grid.cells1_offset_tensor) = temp33_cmplx(l, n) * xiDyad_cmplx(o, m);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
                                 }
                             }
                         }

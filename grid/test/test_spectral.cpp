@@ -217,8 +217,32 @@ TEST_F(MinimalGridSetup, SpectralTestUpdateCoords) {
   EXPECT_TRUE(tensor_eq(x_p, expected_x_p));
 }
 
-// TODO: add mpi test with initialized instead of mocked discretization
-// TEST_F(SpectralSetup, TestUpdateGamma) {
+TEST_F(MinimalGridSetup, TestUpdateGamma) {
+  Spectral spectral(*mock_grid);
+
+  spectral.wgt = 0.5;
+
+  Eigen::Tensor<double, 4> C_min_max_avg(3,3,3,3);
+  C_min_max_avg.setValues({
+    {
+      {{11.11,11.12,11.13},{11.21,11.22,11.23},{11.31,11.32,11.33}},
+      {{12.11,12.12,12.13},{12.21,12.22,12.23},{12.31,12.32,12.33}},
+      {{13.11,13.12,13.13},{13.21,13.22,13.23},{13.31,13.32,13.33}}
+    },{
+      {{21.11,21.12,21.13},{21.21,21.22,21.23},{21.31,21.32,21.33}},
+      {{22.11,22.12,22.13},{22.21,22.22,22.23},{22.31,22.32,22.33}},
+      {{23.11,23.12,23.13},{23.21,23.22,23.23},{23.31,23.32,23.33}}
+    },{
+      {{31.11,31.12,31.13},{31.21,31.22,31.23},{31.31,31.32,31.33}},
+      {{32.11,32.12,32.13},{32.21,32.22,32.23},{32.31,32.32,32.33}},
+      {{33.11,33.12,33.13},{33.21,33.22,33.23},{33.31,33.32,33.33}}
+    }
+  });
+  spectral.update_gamma(C_min_max_avg);
+  ASSERT_EQ(tensor_sum(spectral.gamma_hat), std::complex<double>(0, 0));
+  // TODO: add mpi test with initialized instead of mocked discretization
+  // TODO: find testcases that cause gamma fluctuation
+}
 //   MockDiscretization mock_discretization;
 //   int cells_[] = {2, 1, 1};
 //   double geom_size_[] = {2e-5, 1e-5, 1e-5};
