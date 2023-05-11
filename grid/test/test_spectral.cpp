@@ -171,6 +171,60 @@ TEST_F(MinimalGridSetup,SpectralTestInit) {
 //   spectral.update_coords(F);
 // }
 
+
+TEST_F(MinimalGridSetup, SpectralTestUpdateCoords) {
+  Spectral spectral(*mock_grid);
+  init_tensorfield(spectral, *mock_grid);
+  init_vectorfield(spectral, *mock_grid);
+
+  spectral.xi2nd.resize(3, 2, 1, 1);
+  spectral.xi2nd.setValues({
+   {{{ c( 0               ,  0               ) }},
+    {{ c( 0               ,  314159.2653589793) }}},
+   {{{ c( 0               ,  0               ) }},
+    {{ c( 0               ,  0               ) }}},
+   {{{ c( 0               ,  0               ) }},
+    {{ c( 0               ,  0               ) }}}
+  });
+
+  spectral.wgt = 0.5;
+
+  Eigen::Tensor<double, 2> expected_x_n(3, 12);
+  expected_x_n.setValues({
+   {  1.158890000000004e-310,  1.158890000000004e-310,  1.158890000000004e-310,  1.158890000000004e-310,  
+      1.158890000000004e-310,  1e-05                 ,  1.158890000000004e-310,  1e-05                 ,  
+      1.158950000000012e-310,  1.158950000000012e-310,  1e-05                 ,  1e-05                   },
+   {  1e-05                 ,  1e-05                 ,  1e-05                 ,  1e-05                 ,  
+      1.158890000000004e-310,  1e-05                 ,  1.158890000000004e-310,  1e-05                 ,  
+      1.158950000000012e-310,  1.158950000000012e-310,  1e-05                 ,  1e-05                   },
+   {  2e-05                 ,  2e-05                 ,  2e-05                 ,  2e-05                 ,  
+      1.158890000000004e-310,  1e-05                 ,  1.158890000000004e-310,  1e-05                 ,  
+      1.158950000000012e-310,  1.158950000000012e-310,  1e-05      ,  1e-05                              }
+  });
+
+  Eigen::Tensor<double, 2> expected_x_p(3, 2);
+  expected_x_p.setValues({
+   {   5e-06,  5e-06  },
+   {  1.5e-05, 5e-06  },
+   {   5e-06,  5e-06  }
+  });
+
+  Eigen::Tensor<double, 5> F(3, 3, mock_grid->cells[0], mock_grid->cells[1], mock_grid->cells[2]);
+  Eigen::Matrix3d math_I3 = Eigen::Matrix3d::Identity();
+  for (int i = 0; i < 3; ++i) {
+    for (int j = 0; j < 3; ++j){
+        F.slice(Eigen::array<Eigen::Index, 5>({i, j, 0, 0, 0}),
+                Eigen::array<Eigen::Index, 5>({1, 1, mock_grid->cells[0], mock_grid->cells[1], mock_grid->cells[2]}))
+                .setConstant(math_I3(i, j));
+    }
+  }
+  Eigen::Tensor<double, 2> x_n(3, 12);
+  Eigen::Tensor<double, 2> x_p(3, 2);
+  spectral.update_coords(F, x_n, x_p);
+  EXPECT_TRUE(tensor_eq(x_n, expected_x_n));
+  EXPECT_TRUE(tensor_eq(x_p, expected_x_p));
+}
+
 // TODO: add mpi test with initialized instead of mocked discretization
 // TEST_F(SpectralSetup, TestUpdateGamma) {
 //   MockDiscretization mock_discretization;

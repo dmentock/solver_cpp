@@ -197,26 +197,7 @@ std::array<std::complex<double>, 3> Spectral::get_freq_derivative(std::array<int
     return freq_derivative;
 }
 
-void Spectral::generate_plans(double* field_real_data,
-                              std::complex<double>* field_fourier_data, 
-                              int size, ptrdiff_t cells_fftw_reversed[3], int fftw_planner_flag,
-                              fftw_plan &plan_forth, 
-                              fftw_plan &plan_back){
-    plan_forth = fftw_mpi_plan_many_dft_r2c(3, cells_fftw_reversed, size,
-                                                FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
-                                                field_real_data,
-                                                reinterpret_cast<fftw_complex*>(field_fourier_data),
-                                                PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_OUT);
-
-    plan_back = fftw_mpi_plan_many_dft_c2r(3, cells_fftw_reversed, size,
-                                                FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
-                                                reinterpret_cast<fftw_complex*>(field_fourier_data),
-                                                field_real_data,
-                                                PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_IN);
-}
-
-void Spectral::update_coords(Eigen::Tensor<double, 5> &F) {
-
+void Spectral::update_coords(Eigen::Tensor<double, 5> &F, Eigen::Tensor<double, 2>& reshaped_x_n, Eigen::Tensor<double, 2>& reshaped_x_p) {
     Spectral::tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
         Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2})).device(Eigen::DefaultDevice{}) = F;
     Spectral::tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}),
@@ -330,10 +311,9 @@ void Spectral::update_coords(Eigen::Tensor<double, 5> &F) {
             }
         }
     }
-    Eigen::Tensor<double, 2> reshaped_x_n = x_n->reshape(Eigen::array<Eigen::Index, 2>({3, (grid.cells[0] + 1) * (grid.cells[1] + 1) * (grid.cells2 + 1)}));
-    Spectral::grid.discretization_.set_node_coords(&reshaped_x_n);
-    Eigen::Tensor<double, 2> reshaped_x_p = x_p->reshape(Eigen::array<Eigen::Index, 2>({3, grid.cells[0] * grid.cells[1] * grid.cells2}));
-    Spectral::grid.discretization_.set_ip_coords(&reshaped_x_p);
+
+    reshaped_x_n = x_n->reshape(Eigen::array<Eigen::Index, 2>({3, (grid.cells[0] + 1) * (grid.cells[1] + 1) * (grid.cells2 + 1)}));
+    reshaped_x_p = x_p->reshape(Eigen::array<Eigen::Index, 2>({3, grid.cells[0] * grid.cells[1] * grid.cells2}));
 }
 
 void Spectral::constitutive_response(Eigen::Tensor<double, 5> &P, 
