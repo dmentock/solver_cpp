@@ -3,6 +3,7 @@
 #include <iostream>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <Eigen/Dense>
+#include <tensor_operations.h>
 
 #include <complex>
 #include <vector>
@@ -557,4 +558,86 @@ void Spectral::calculate_masked_compliance( Eigen::Tensor<double, 4> &C,
     temp99_real.setZero();
   }
   f_math_99to3333(temp99_real.data(), masked_compliance.data());
+}
+
+Eigen::Tensor<double, 5> Spectral::gamma_convolution(Eigen::Tensor<double, 5> &field, Eigen::Tensor<double, 2> &field_aim){
+
+  tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}), 
+                          Eigen::array<Eigen::Index, 5>({3, 3, grid.cells0_reduced, grid.cells[1], grid.cells2})).setConstant(0);
+  tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}), 
+                          Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2})) = field;
+
+  fftw_mpi_execute_dft_r2c(plan_tensor_forth, tensorField_real->data(), tensorField_fourier_fftw);
+
+  Eigen::Matrix<std::complex<double>, 3, 3> temp33_cmplx;
+  if (config.num_grid.memory_efficient) {
+    Eigen::Matrix<double, 6, 6> A;
+    Eigen::Matrix<double, 6, 6> A_inv;
+    Eigen::Matrix<std::complex<double>, 3, 3> xiDyad_cmplx;
+    #pragma omp parallel for private(l, m, n, o, temp33_cmplx, xiDyad_cmplx, A, A_inv, err, gamma_hat)
+    for (int j = 0; j < grid.cells1_tensor; ++j) {
+      for (int k = 0; k < grid.cells[2]; ++k) {
+        for (int i = 0; i < grid.cells0_reduced; ++i) {
+          if (!(i == 0 && j + grid.cells1_offset_tensor == 0 && k == 0)) { // singular point at xi=(0.0,0.0,0.0) i.e. i=j=k=1
+            for (int l = 0; l < 3; ++l) {
+                for (int m = 0; m < 3; ++m) {
+                    xiDyad_cmplx(l, m) = std::conj(-xi1st(l, i, k, j)) * xi1st(m, i, k, j);
+                }
+            }
+            for (int l = 0; l < 3; ++l) {
+                for (int m = 0; m < 3; ++m) {
+                    for (int n = 0; n < 3; ++n) {
+                        for (int o = 0; o < 3; ++o) {
+                            temp33_cmplx(l, m) += std::complex<double>(C_ref(l, n, m, o)) * xiDyad_cmplx(n, o);
+                        }
+                    }
+                }
+            }
+            A.block(0, 0, 3, 3) = temp33_cmplx.real();
+            A.block(3, 3, 3, 3) = temp33_cmplx.real();
+            A.block(0, 3, 3, 3) = temp33_cmplx.imag();
+            A.block(3, 0, 3, 3) = -temp33_cmplx.imag();
+            // TODO: if det(A(1:3,1:3)> ...)
+            Spectral::tensorField_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, i, k, j}),
+                                                    Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1})).setConstant(std::complex<double>(0,0));
+          }
+        }
+      }
+    }
+  } else {
+    Eigen::Matrix<std::complex<double>, Eigen::Dynamic, Eigen::Dynamic> res;
+    for (int j = 0; j < grid.cells1_tensor; ++j) {
+      for (int k = 0; k < grid.cells[2]; ++k) {
+        for (int i = 0; i < grid.cells0_reduced; ++i) {
+          for (int l = 0; l < 3; ++l) {
+            for (int m = 0; m < 3; ++m) {
+              Eigen::Tensor<std::complex<double>, 2> gamma_hat_slice =  gamma_hat.chip(j, 6).chip(k,5).chip(i,4).chip(m,1).chip(l,0)
+                              .slice(Eigen::array<Eigen::Index, 2>({0,0}), Eigen::array<Eigen::Index, 2>({3,3}));
+              Eigen::Map<const Eigen::Matrix<std::complex<double>, 3, 3>> gamma_hat_slice_mat(gamma_hat_slice.data());
+              Eigen::Tensor<std::complex<double>, 2> tensorField_fourier_slice = (*tensorField_fourier).chip(j, 4).chip(k,3).chip(i,2)
+                              .slice(Eigen::array<Eigen::Index, 2>({0,0}), Eigen::array<Eigen::Index, 2>({3,3}));
+              Eigen::Map<const Eigen::Matrix<std::complex<double>, 3, 3>> tensorField_fourier_slice_mat(tensorField_fourier_slice.data());
+              res = gamma_hat_slice_mat * tensorField_fourier_slice_mat;
+              temp33_cmplx(l, m) = tensor_sum(res);
+            }
+          }
+          for (int l = 0; l < 3; ++l) {
+            for (int m = 0; m < 3; ++m) {
+              (*tensorField_fourier)(l, m, i, k, j) = temp33_cmplx(l, m);
+            }
+          }
+        }
+      }
+    }
+  }
+  if (grid.cells2_offset==0) {
+    for (int l = 0; l < 3; ++l) {
+      for (int m = 0; m < 3; ++m) {
+        (*tensorField_fourier)(l, m, 0, 0, 0) = std::complex<double>(field_aim(l, m), 0);
+      }
+    }
+  }
+  fftw_mpi_execute_dft_c2r(plan_tensor_back, tensorField_fourier_fftw, tensorField_real->data());
+  return tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}), 
+                                 Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2}));
 }
