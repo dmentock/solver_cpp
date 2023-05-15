@@ -14,15 +14,16 @@ void DiscretizationGrid::init(bool restart, VtiReader* vti_reader) {
     std::cout << "World Size: " << world_size << "   Rank: " << world_rank << std::endl;
 
     double origin[3];
-    int* materialAt_global = vti_reader->read_vti_material_data("17grains.vti", cells, geom_size, origin);
+    // int* materialAt_global = vti_reader->read_vti_material_data("17grains.vti", cells, geom_size, origin);
+    int* materialAt_global;
     if (world_rank != 0) {
     }
-    MPI_Bcast(cells, 3, MPI_INTEGER, 0, MPI_COMM_WORLD);
+    MPI_Bcast(cells.data(), 3, MPI_INTEGER, 0, MPI_COMM_WORLD);
     if (cells[0] < 2) {
         std::cerr << "cells(1) must be larger than 1" << std::endl;
         MPI_Abort(MPI_COMM_WORLD, 1);
     }
-    MPI_Bcast(geom_size, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
+    MPI_Bcast(geom_size.data(), 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     MPI_Bcast(origin, 3, MPI_DOUBLE, 0, MPI_COMM_WORLD);
     std::cout << "cells:  " << cells[0] << " x " << cells[1] << " x " << cells[2] << std::endl;
     std::cout << "size:   " << geom_size[0] << " x " << geom_size[1] << " x " << geom_size[2] << " m³" << std::endl;

@@ -15,14 +15,16 @@ class MockDiscretization : public Discretization {
 
 class MockDiscretizedGrid : public DiscretizationGrid {
   public:
-    MockDiscretizedGrid(Discretization& discretization, int* cells_, double* geom_size_) : DiscretizationGrid(discretization) {
+    MockDiscretizedGrid(Discretization& discretization, 
+                        std::array<int, 3> cells_, 
+                        std::array<double, 3> geom_size_) : DiscretizationGrid(discretization) {
       world_rank = 0;
       world_size = 1;
-      cells[0] = cells_[0]; cells[1] = cells_[1]; cells[2] = cells_[2];
+      cells = cells_;
       scaled_geom_size[0] = cells_[0]; scaled_geom_size[1] = cells_[1]; scaled_geom_size[2] = cells_[2];
       cells2 = cells[2];
       cells2_offset = 0;  
-      geom_size[0] = geom_size_[0]; geom_size[1] = geom_size_[1]; geom_size[2] = geom_size_[2];
+      geom_size = geom_size_;
       size2 = geom_size[2] * cells2 / cells[2];
       size2Offset = geom_size[2] * cells2_offset / cells[2];
       cells0_reduced = cells[0] / 2 + 1;

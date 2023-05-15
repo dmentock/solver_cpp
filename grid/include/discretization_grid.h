@@ -10,12 +10,12 @@ public:
     DiscretizationGrid(Discretization& discretization) : discretization_(discretization) {}
     int world_rank, world_size;
 
-    int cells[3];
+    std::array<int, 3> cells;
     int cells2;
     int cells2_offset;
 
-    double geom_size[3];
-    double scaled_geom_size[3];
+    std::array<double, 3> geom_size;
+    std::array<double, 3> scaled_geom_size;
     double size2;
     double size2Offset;
 

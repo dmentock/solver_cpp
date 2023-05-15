@@ -97,17 +97,14 @@ public:
   Eigen::Tensor<double, 4> C_ref;
 
 protected:
-    derivative_ids spectral_derivative_ID;
-    int tensor_size = 9;
-    int vector_size = 3;
-    int scalar_size = 1;
+  DiscretizationGrid& grid;
+  derivative_ids spectral_derivative_ID;
+  int tensor_size = 9;
+  int vector_size = 3;
+  int scalar_size = 1;
 
 private:
     const double TAU = 2 * M_PI;
 
-
-    
-protected:
-    DiscretizationGrid& grid;
 };
 #endif // SPECTRAL_H

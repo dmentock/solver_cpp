@@ -35,17 +35,16 @@ public:
   }
 };
 
-class MinimalGridSetup : public ::testing::Test {
-protected:
-  std::unique_ptr<MockDiscretizedGrid> mock_grid;
+class SimpleGridSetup : public ::testing::Test {
 public:
-  void SetUp() {
+  MockDiscretizedGrid& init_grid(std::array<int, 3> dims) {
     MockDiscretization mock_discretization;
-    int cells_[] = {2, 1, 1};
-    double geom_size_[] = {2e-5, 1e-5, 1e-5};
-    mock_grid.reset(new MockDiscretizedGrid(mock_discretization, &cells_[0], &geom_size_[0]));
+    std::array<int, 3> cells_ = dims;
+    std::array<double, 3> geom_size_({dims[0]*1e-5, dims[1]*1e-5, dims[2]*1e-5});
+    MockDiscretizedGrid mock_grid(mock_discretization, cells_, geom_size_);
+    return mock_grid;
   }
-  void init_tensorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid){
+  void init_tensorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid) {
     ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
     spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
                        spectral.tensorField_real, spectral.tensorField_fourier, spectral.tensorField_fourier_fftw,
@@ -78,12 +77,12 @@ TEST_F(MinimalGridSetup,SpectralTestInit) {
   Eigen::Tensor<std::complex<double>, 4> expected_xi2nd;
   expected_xi2nd.resize(3, 2, 1, 1);
   expected_xi2nd.setValues({
-   {{{ c( 0               ,  0               ) }},
+   {{{ c( 0               ,  0                ) }},
     {{ c( 0               ,  314159.2653589793) }}},
-   {{{ c( 0               ,  0               ) }},
-    {{ c( 0               ,  0               ) }}},
-   {{{ c( 0               ,  0               ) }},
-    {{ c( 0               ,  0               ) }}}
+   {{{ c( 0               ,  0                ) }},
+    {{ c( 0               ,  0                ) }}},
+   {{{ c( 0               ,  0                ) }},
+    {{ c( 0               ,  0                ) }}}
   });
 
   spectral.config.num_grid.memory_efficient = 1;
@@ -102,23 +101,24 @@ TEST_F(MinimalGridSetup,SpectralTestInit) {
   // TODO: mock calls to set_up_fftw template function
 }
 
-TEST_F(MinimalGridSetup,SpectralTestInitDivergenceCorrection) {
-  Spectral spectral(*mock_grid);
-  mock_grid->geom_size = std::array<double, 3>({3,4,5});
+TEST_F(SimpleGridSetup,SpectralTestInitDivergenceCorrection) {
+  MockDiscretizedGrid& mock_grid = init_grid(std::array<int, 3>({2,1,1}));
+  Spectral spectral(mock_grid);
+  mock_grid.geom_size = std::array<double, 3>({3,4,5});
 
   spectral.config.num_grid.divergence_correction = 0;
   spectral.init();
-  ASSERT_EQ(mock_grid->scaled_geom_size, mock_grid->geom_size);
+  ASSERT_EQ(mock_grid.scaled_geom_size, mock_grid.geom_size);
 
   spectral.config.num_grid.divergence_correction = 1;
   spectral.init();
   std::array<double, 3>expected_scaled_geom_size_1({0.75, 1, 1.25});
-  ASSERT_EQ(mock_grid->scaled_geom_size, expected_scaled_geom_size_1);
+  ASSERT_EQ(mock_grid.scaled_geom_size, expected_scaled_geom_size_1);
 
   spectral.config.num_grid.divergence_correction = 2;
   spectral.init();
   std::array<double, 3>expected_scaled_geom_size_2({0.6, 0.8, 1 });
-  ASSERT_EQ(mock_grid->scaled_geom_size, expected_scaled_geom_size_2);
+  ASSERT_EQ(mock_grid.scaled_geom_size, expected_scaled_geom_size_2);
 }
 
 //   MockDiscretization mock_discretization;
@@ -183,10 +183,11 @@ TEST_F(MinimalGridSetup,SpectralTestInitDivergenceCorrection) {
 // }
 
 
-TEST_F(MinimalGridSetup, SpectralTestUpdateCoords) {
-  Spectral spectral(*mock_grid);
-  init_tensorfield(spectral, *mock_grid);
-  init_vectorfield(spectral, *mock_grid);
+TEST_F(SimpleGridSetup, SpectralTestUpdateCoords) {
+  MockDiscretizedGrid& mock_grid = init_grid(std::array<int, 3>({2,1,1}));
+  Spectral spectral(mock_grid);
+  init_tensorfield(spectral, mock_grid);
+  init_vectorfield(spectral, mock_grid);
 
   spectral.xi2nd.resize(3, 2, 1, 1);
   spectral.xi2nd.setValues({
@@ -228,8 +229,9 @@ TEST_F(MinimalGridSetup, SpectralTestUpdateCoords) {
   EXPECT_TRUE(tensor_eq(x_p, expected_x_p));
 }
 
-TEST_F(MinimalGridSetup, TestUpdateGamma) {
-  Spectral spectral(*mock_grid);
+TEST_F(SimpleGridSetup, TestUpdateGamma) {
+  MockDiscretizedGrid& mock_grid = init_grid(std::array<int, 3>({2,1,1}));
+  Spectral spectral(mock_grid);
 
   spectral.wgt = 0.5;
 
@@ -271,8 +273,9 @@ TEST_F(MinimalGridSetup, TestUpdateGamma) {
   // TODO: find testcases that cause gamma fluctuation
 }
 
-TEST_F(MinimalGridSetup, SpectralTestForwardField) {
-  Spectral spectral(*mock_grid);
+TEST_F(SimpleGridSetup, SpectralTestForwardField) {
+  MockDiscretizedGrid& mock_grid = init_grid(std::array<int, 3>({2,1,1}));
+  Spectral spectral(mock_grid);
   spectral.wgt = 0.5;
 
   Eigen::Tensor<double, 5> field_last_inc(3, 3, 2, 1, 1);
@@ -310,8 +313,9 @@ TEST_F(MinimalGridSetup, SpectralTestForwardField) {
   EXPECT_TRUE(tensor_eq(forwarded_field, expected_forwarded_field));
 }
 
-TEST_F(MinimalGridSetup, SpectralTestMaskedCompliance) {
-  Spectral spectral(*mock_grid);
+TEST_F(SimpleGridSetup, SpectralTestMaskedCompliance) {
+  MockDiscretizedGrid& mock_grid = init_grid(std::array<int, 3>({2,1,1}));
+  Spectral spectral(mock_grid);
   spectral.wgt = 0.5;
 
   std::array<double, 4> rot_bc_q = {1, 0, 0, 0};
@@ -394,10 +398,10 @@ TEST_F(MinimalGridSetup, SpectralTestMaskedCompliance) {
 }
 
 
-TEST_F(MinimalGridSetup, SpectralTestGammaConvolution) {
-  Spectral spectral(*mock_grid);
-
-  init_tensorfield(spectral, *mock_grid);
+TEST_F(SimpleGridSetup, SpectralTestGammaConvolution) {
+  MockDiscretizedGrid& mock_grid = init_grid(std::array<int, 3>({2,1,1}));
+  Spectral spectral(mock_grid);
+  init_tensorfield(spectral, mock_grid);
 
   Eigen::Tensor<double, 5> field(3, 3, 2, 1, 1);
   field.setValues({
@@ -491,7 +495,7 @@ TEST_F(MinimalGridSetup, SpectralTestGammaConvolution) {
      {{  0                     }}}}
   });
 
-  spectral.gamma_hat.resize(3,3,3,3,mock_grid->cells0_reduced,mock_grid->cells[2],mock_grid->cells1_tensor);
+  spectral.gamma_hat.resize(3,3,3,3,mock_grid.cells0_reduced,mock_grid.cells[2],mock_grid.cells1_tensor);
   spectral.gamma_hat.setZero();
 
   spectral.config.num_grid.memory_efficient = 0;
