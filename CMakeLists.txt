@@ -1,7 +1,7 @@
 project(myproject)
 cmake_minimum_required(VERSION 3.10)
 
-set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD 20)
 
 add_compile_options(-Wno-ignored-attributes)
 
@@ -20,6 +20,8 @@ find_library(MPI_CXX_LIBRARIES NAMES mpicxx PATHS "${PETSC_ARCH_DIR}/lib" NO_DEF
 include_directories(${MPI_INCLUDE_PATH})
 
 find_package(Eigen3 REQUIRED)
+find_package(yaml-cpp REQUIRED)
+
 # # possibly use FetchContent to make version control of modules easier
 # include(FetchContent)
 # FetchContent_Declare(
@@ -36,4 +38,5 @@ include_directories(${CMAKE_SOURCE_DIR}/include
                     ${EIGEN3_INCLUDE_DIR})
 
 add_subdirectory(src)
+add_subdirectory(test)
 add_subdirectory(grid)

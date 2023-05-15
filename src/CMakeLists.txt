@@ -26,6 +26,7 @@ target_link_libraries(f_rotations
                     f_math)
 # target_compile_options(f_rotations PUBLIC "-fvisibility=default")
 
-
-
 add_library(discretization discretization.cpp)
+
+add_library(yaml_reader yaml_reader.cpp)
+target_link_libraries(yaml_reader yaml-cpp)

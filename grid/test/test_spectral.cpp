@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <array_matcher.h>
+
 #include <iostream>
 #include <cstdio>
 #include <fstream>
@@ -23,28 +23,13 @@ class PetscMpiEnv : public ::testing::Environment {
 protected:
   PetscErrorCode ierr;
 public:
-    virtual void SetUp() {
-        int argc = 0;
-        char **argv = NULL;
-    ierr = PetscInitialize(&argc, &argv, (char *)0,"PETSc help message.");
-    ASSERT_EQ(ierr, 0) << "Error initializing PETSc.";
-  }
-  virtual void TearDown() override {
-    ierr = PetscFinalize();
-    ASSERT_EQ(ierr, 0) << "Error finalizing PETSc.";
-    }
-};
-
-class SpectralSetup : public ::testing::Test {
-  protected:
-    PetscErrorCode ierr;
-  void SetUp() override {
+  virtual void SetUp() {
     int argc = 0;
     char **argv = NULL;
     ierr = PetscInitialize(&argc, &argv, (char *)0,"PETSc help message.");
     ASSERT_EQ(ierr, 0) << "Error initializing PETSc.";
   }
-  void TearDown() override {
+  virtual void TearDown() override {
     ierr = PetscFinalize();
     ASSERT_EQ(ierr, 0) << "Error finalizing PETSc.";
   }
@@ -101,15 +86,41 @@ TEST_F(MinimalGridSetup,SpectralTestInit) {
     {{ c( 0               ,  0               ) }}}
   });
 
+  spectral.config.num_grid.memory_efficient = 1;
+  Eigen::DSizes<Eigen::DenseIndex, 7> expected_gamma_hat_dims_mem_eff(3, 3, 3, 3, 1, 1, 1);
+
   spectral.init();
   EXPECT_TRUE(tensor_eq(spectral.xi1st, expected_xi1st));
   EXPECT_TRUE(tensor_eq(spectral.xi2nd, expected_xi2nd));
+  ASSERT_EQ(spectral.gamma_hat.dimensions(), expected_gamma_hat_dims_mem_eff);
 
+  spectral.config.num_grid.memory_efficient = 0;
   Eigen::DSizes<Eigen::DenseIndex, 7> expected_gamma_hat_dims(3, 3, 3, 3, 2, 1, 1);
+
+  spectral.init();
   ASSERT_EQ(spectral.gamma_hat.dimensions(), expected_gamma_hat_dims);
+  // TODO: mock calls to set_up_fftw template function
 }
 
-// TEST_F(SpectralSetup, TestUpdateCoordsInit) {
+TEST_F(MinimalGridSetup,SpectralTestInitDivergenceCorrection) {
+  Spectral spectral(*mock_grid);
+  mock_grid->geom_size = std::array<double, 3>({3,4,5});
+
+  spectral.config.num_grid.divergence_correction = 0;
+  spectral.init();
+  ASSERT_EQ(mock_grid->scaled_geom_size, mock_grid->geom_size);
+
+  spectral.config.num_grid.divergence_correction = 1;
+  spectral.init();
+  std::array<double, 3>expected_scaled_geom_size_1({0.75, 1, 1.25});
+  ASSERT_EQ(mock_grid->scaled_geom_size, expected_scaled_geom_size_1);
+
+  spectral.config.num_grid.divergence_correction = 2;
+  spectral.init();
+  std::array<double, 3>expected_scaled_geom_size_2({0.6, 0.8, 1 });
+  ASSERT_EQ(mock_grid->scaled_geom_size, expected_scaled_geom_size_2);
+}
+
 //   MockDiscretization mock_discretization;
 //   int cells_[] = {2, 1, 1};
 //   double geom_size_[] = {2e-5, 1e-5, 1e-5};
@@ -238,8 +249,24 @@ TEST_F(MinimalGridSetup, TestUpdateGamma) {
       {{33.11,33.12,33.13},{33.21,33.22,33.23},{33.31,33.32,33.33}}
     }
   });
+
+  spectral.xi1st.resize(3, 2, 1, 1);
+  spectral.xi1st.setValues({
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}},
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}},
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}}
+  });
+
+  spectral.config.num_grid.memory_efficient = 0;
+
+  spectral.gamma_hat.resize(3, 3, 3, 3, 1, 1, 1);
+  Eigen::Tensor<std::complex<double>, 7> expected_gamma_hat(3, 3, 3, 3, 1, 1, 1);
+  expected_gamma_hat.setConstant(std::complex<double>(0.0, 0.0));
   spectral.update_gamma(C_min_max_avg);
-  ASSERT_EQ(tensor_sum(spectral.gamma_hat), std::complex<double>(0, 0));
+  EXPECT_TRUE(tensor_eq(spectral.gamma_hat, expected_gamma_hat));
   // TODO: add mpi test with initialized instead of mocked discretization
   // TODO: find testcases that cause gamma fluctuation
 }
@@ -366,92 +393,116 @@ TEST_F(MinimalGridSetup, SpectralTestMaskedCompliance) {
   // TODO: Find more understandable test setup
 }
 
-//   Eigen::Tensor<double, 4> C_min_max_avg(3,3,3,3);
-//   C_min_max_avg.setValues({
-//     {
-//       {{11.11,11.12,11.13},{11.21,11.22,11.23},{11.31,11.32,11.33}},
-//       {{12.11,12.12,12.13},{12.21,12.22,12.23},{12.31,12.32,12.33}},
-//       {{13.11,13.12,13.13},{13.21,13.22,13.23},{13.31,13.32,13.33}}
-//     },{
-//       {{21.11,21.12,21.13},{21.21,21.22,21.23},{21.31,21.32,21.33}},
-//       {{22.11,22.12,22.13},{22.21,22.22,22.23},{22.31,22.32,22.33}},
-//       {{23.11,23.12,23.13},{23.21,23.22,23.23},{23.31,23.32,23.33}}
-//     },{
-//       {{31.11,31.12,31.13},{31.21,31.22,31.23},{31.31,31.32,31.33}},
-//       {{32.11,32.12,32.13},{32.21,32.22,32.23},{32.31,32.32,32.33}},
-//       {{33.11,33.12,33.13},{33.21,33.22,33.23},{33.31,33.32,33.33}}
-//     }
-//   });
-//   spectral.init(); // TODO: recreate only the required initializations in test constructor
-//   spectral.update_gamma(C_min_max_avg);
-//   // print_tensor(&spectral.gamma_hat);
-// }
 
-TEST_F(SpectralSetup, TestUpdateGammaReal) {
-  MockDiscretization mock_discretization;
-  int cells_[] = {2, 1, 1};
-  double geom_size_[] = {2e-5, 1e-5, 1e-5};
-  MockDiscretizedGrid mock_grid(mock_discretization, &cells_[0], &geom_size_[0]);
-  Spectral spectral(mock_grid);
-  spectral.wgt = 4.1666666666666664e-002;
+TEST_F(MinimalGridSetup, SpectralTestGammaConvolution) {
+  Spectral spectral(*mock_grid);
 
-  Eigen::Tensor<double, 4> C_min_max_avg(3,3,3,3);
-  C_min_max_avg.setValues({
-{
-  {
-    { 1.0959355524918582e+11, 3.3379178619552708e+08, 9.9655985396867371e+08 },
-    { 3.3379178619552606e+08, 5.9373830941431534e+10, -1.8163978776946735e+08 },
-    { 9.9655985396868014e+08, -1.8163978776946974e+08, 5.8602613809382538e+10 }
-    },
-  {
-    { 3.3379178619553375e+08, 2.7303830941431511e+10, -1.8163978776947090e+08 },
-    { 2.7303830941431534e+10, -1.0453692167466900e+09, -8.4651024104992294e+08 },
-    { -1.8163978776947141e+08, -8.4651024104991937e+08, 7.1157743055114186e+08 }
-    },
-  {
-    { 9.9655985396867180e+08, -1.8163978776947096e+08, 2.6532613809382538e+10 },
-    { -1.8163978776947045e+08, -8.4651024104991782e+08, 7.1157743055114245e+08 },
-    { 2.6532613809382553e+10, 7.1157743055114353e+08, -1.5004961291872242e+08 }
-    }
-  },
-{
-  {
-    { 3.3379178619552892e+08, 2.7303830941431534e+10, -1.8163978776947221e+08 },
-    { 2.7303830941431511e+10, -1.0453692167466853e+09, -8.4651024104992151e+08 },
-    { -1.8163978776946959e+08, -8.4651024104992199e+08, 7.1157743055114293e+08 }
-    },
-  {
-    { 5.9373830941431519e+10, -1.0453692167466898e+09, -8.4651024104991913e+08 },
-    { -1.0453692167466860e+09, 1.0889425461969577e+11, -5.3278316695396471e+08 },
-    { -8.4651024104991531e+08, -5.3278316695396245e+08, 5.9301914438872627e+10 }
-    },
-  {
-    { -1.8163978776946834e+08, -8.4651024104992294e+08, 7.1157743055114436e+08 },
-    { -8.4651024104992390e+08, -5.3278316695396757e+08, 2.7231914438872620e+10 },
-    { 7.1157743055114436e+08, 2.7231914438872643e+10, 7.1442295472345102e+08 }
-    }
-  },
-{
-  {
-    { 9.9655985396867156e+08, -1.8163978776947078e+08, 2.6532613809382553e+10 },
-    { -1.8163978776946959e+08, -8.4651024104992568e+08, 7.1157743055114770e+08 },
-    { 2.6532613809382519e+10, 7.1157743055114686e+08, -1.5004961291873169e+08 }
-    },
-  {
-    { -1.8163978776946813e+08, -8.4651024104991841e+08, 7.1157743055114532e+08 },
-    { -8.4651024104992223e+08, -5.3278316695396149e+08, 2.7231914438872643e+10 },
-    { 7.1157743055114579e+08, 2.7231914438872608e+10, 7.1442295472345114e+08 }
-    },
-  {
-    { 5.8602613809382538e+10, 7.1157743055114031e+08, -1.5004961291871765e+08 },
-    { 7.1157743055114365e+08, 5.9301914438872627e+10, 7.1442295472345245e+08 },
-    { -1.5004961291872787e+08, 7.1442295472344446e+08, 1.0966547175174469e+11 }
-    }
-  }
-});
-  spectral.init(); // TODO: recreate only the required initializations in test constructor
-  spectral.update_gamma(C_min_max_avg); // TODO: assert values that are not all 0s
-} 
+  init_tensorfield(spectral, *mock_grid);
+
+  Eigen::Tensor<double, 5> field(3, 3, 2, 1, 1);
+  field.setValues({
+   {{{{  9235641.189939182  }},
+     {{  9632014.409984397  }}},
+    {{{ -228992.9056867184  }},
+     {{ -137151.7288854052  }}},
+    {{{ -165027.6813614937  }},
+     {{  277655.7139282213  }}}},
+   {{{{ -228992.9056867179  }},
+     {{ -137151.7288854057  }}},
+    {{{  9558636.645616129  }},
+     {{  9685168.179161072  }}},
+    {{{ -255116.5173901524  }},
+     {{  281005.5981252654  }}}},
+   {{{{ -165044.1841296307  }},
+     {{  277683.4794996136  }}},
+    {{{ -255142.0290418919  }},
+     {{  281033.698685078   }}},
+    {{{  15980056.25126295  }},
+     {{  15457099.20758347  }}}}
+  });
+
+  Eigen::Tensor<double, 2> field_aim(3, 3);
+  field_aim.setValues({
+   {  3.577335445476857e-05,  0                    ,  0                     },
+   {  0                    ,  3.972872444401787e-05,  0                     },
+   {  0                    ,  0                    ,  0                     }
+  });
+
+  spectral.xi1st.resize(3, 2, 1, 1);
+  spectral.xi1st.setValues({
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}},
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}},
+   {{{ c( 0 ,  0 ) }},
+    {{ c( 0 ,  0 ) }}}
+  });
+
+  spectral.C_ref.resize(3, 3, 3, 3);
+  spectral.C_ref.setValues({
+   {{{  319815338338.5793 , -3194055848.940187 ,  1346207996.27981   },
+     { -3194055848.940189 ,  186937492844.2772 , -1336138385.28222   },
+     {  1346207996.279819 , -1336138385.282229 ,  188667122643.1543  }},
+    {{ -3194055848.940199 ,  60862529543.84725 , -1336138385.282232  },
+     {  60862529543.84732 ,  6855319131.621506 , -2472432010.810265  },
+     { -1336138385.282216 , -2472432010.810262 , -3661263282.681229  }},
+    {{  1346207996.27981  , -1336138385.282235 ,  62592159342.7244   },
+     { -1336138385.282221 , -2472432010.810261 , -3661263282.681239  },
+     {  62592159342.72446 , -3661263282.681242 ,  1126224014.530425  }}},
+   {{{ -3194055848.940197 ,  60862529543.84734 , -1336138385.282225  },
+     {  60862529543.84727 ,  6855319131.621492 , -2472432010.810268  },
+     { -1336138385.282219 , -2472432010.810261 , -3661263282.681236  }},
+    {{  186937492844.2772 ,  6855319131.621506 , -2472432010.810253  },
+     {  6855319131.621525 ,  316054034155.224  ,  1077260521.735198  },
+     { -2472432010.81026  ,  1077260521.735203 ,  192428426826.5096  }},
+    {{ -1336138385.282215 , -2472432010.810262 , -3661263282.681245  },
+     { -2472432010.810267 ,  1077260521.735171 ,  66353463526.07964  },
+     { -3661263282.68124  ,  66353463526.0797  ,  258877863.546978   }}},
+   {{{  1346207996.279811 , -1336138385.282228 ,  62592159342.72445  },
+     { -1336138385.282221 , -2472432010.810267 , -3661263282.68124   },
+     {  62592159342.7244  , -3661263282.681229 ,  1126224014.5304    }},
+    {{ -1336138385.282221 , -2472432010.810263 , -3661263282.681248  },
+     { -2472432010.810259 ,  1077260521.735199 ,  66353463526.0797   },
+     { -3661263282.681232 ,  66353463526.07965 ,  258877863.5469728  }},
+    {{  188667122643.1543 , -3661263282.681223 ,  1126224014.530443  },
+     { -3661263282.681215 ,  192428426826.5095 ,  258877863.5469899  },
+     {  1126224014.530421 ,  258877863.5469708 ,  314324404356.3469  }}}
+  });
+
+  Eigen::Tensor<double, 5> expected_gamma_field(3, 3, 2, 1, 1);
+  expected_gamma_field.setValues({
+   {{{{  3.577335445476857e-05 }},
+     {{  3.577335445476857e-05 }}},
+    {{{  0                     }},
+     {{  0                     }}},
+    {{{  0                     }},
+     {{  0                     }}}},
+   {{{{  0                     }},
+     {{  0                     }}},
+    {{{  3.972872444401787e-05 }},
+     {{  3.972872444401787e-05 }}},
+    {{{  0                     }},
+     {{  0                     }}}},
+   {{{{  0                     }},
+     {{  0                     }}},
+    {{{  0                     }},
+     {{  0                     }}},
+    {{{  0                     }},
+     {{  0                     }}}}
+  });
+
+  spectral.gamma_hat.resize(3,3,3,3,mock_grid->cells0_reduced,mock_grid->cells[2],mock_grid->cells1_tensor);
+  spectral.gamma_hat.setZero();
+
+  spectral.config.num_grid.memory_efficient = 0;
+  Eigen::Tensor<double, 5> gamma_field0 = spectral.gamma_convolution(field, field_aim);
+  EXPECT_TRUE(tensor_eq(gamma_field0, expected_gamma_field));
+
+  spectral.config.num_grid.memory_efficient = 1;
+  Eigen::Tensor<double, 5> gamma_field1 = spectral.gamma_convolution(field, field_aim);
+  EXPECT_TRUE(tensor_eq(gamma_field1, expected_gamma_field));
+  //TODO: add test where det of A is large enough to enter if branch for memory_efficient=1
+}
 
 // TEST_F(SpectralSetup, TestConstitutiveResponse) {
 //   MockDiscretizedGrid grid;

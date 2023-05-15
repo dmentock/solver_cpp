@@ -13,30 +13,66 @@
 #include <cmath>
 
 void Spectral::init(){
-    std::cout << "\n <<<+-  spectral_utilities init  -+>>>" << std::endl;
+  std::cout << "\n <<<+-  spectral_utilities init  -+>>>" << std::endl;
 
-    std::cout << "\n M. Diehl, Diploma Thesis TU München, 2010" << std::endl;
-    std::cout << "https://doi.org/10.13140/2.1.3234.3840" << std::endl;
+  std::cout << "\n M. Diehl, Diploma Thesis TU München, 2010" << std::endl;
+  std::cout << "https://doi.org/10.13140/2.1.3234.3840" << std::endl;
 
-    std::cout << "\n P. Eisenlohr et al., International Journal of Plasticity 46:37–53, 2013" << std::endl;
-    std::cout << "https://doi.org/10.1016/j.ijplas.2012.09.012" << std::endl;
+  std::cout << "\n P. Eisenlohr et al., International Journal of Plasticity 46:37–53, 2013" << std::endl;
+  std::cout << "https://doi.org/10.1016/j.ijplas.2012.09.012" << std::endl;
 
-    std::cout << "\n P. Shanthraj et al., International Journal of Plasticity 66:31–45, 2015" << std::endl;
-    std::cout << "https://doi.org/10.1016/j.ijplas.2014.02.006" << std::endl;
+  std::cout << "\n P. Shanthraj et al., International Journal of Plasticity 66:31–45, 2015" << std::endl;
+  std::cout << "https://doi.org/10.1016/j.ijplas.2014.02.006" << std::endl;
 
-    std::cout << "\n P. Shanthraj et al., Handbook of Mechanics of Materials, 2019" << std::endl;
-    std::cout << "https://doi.org/10.1007/978-981-10-6855-3_80" << std::endl;
+  std::cout << "\n P. Shanthraj et al., Handbook of Mechanics of Materials, 2019" << std::endl;
+  std::cout << "https://doi.org/10.1007/978-981-10-6855-3_80" << std::endl;
 
-    //get num_grid 167-224
   grid.cells0_reduced = grid.cells[0] / 2 + 1;
   wgt = std::pow(grid.cells[0] * grid.cells[1] * grid.cells[2], -1);
+
+  //Suggestion: directly write ID values to numerics configuration struct and read values from there
+  if (config.num_grid.derivative == "continuous") {
+      spectral_derivative_ID = DERIVATIVE_CONTINUOUS_ID;
+  } else if (config.num_grid.derivative == "central_difference") {
+      spectral_derivative_ID = DERIVATIVE_CENTRAL_DIFF_ID;
+  } else if (config.num_grid.derivative == "FWBW_difference") {
+      spectral_derivative_ID = DERIVATIVE_FWBW_DIFF_ID;
+  } else {
+      throw std::runtime_error("Invalid value for derivative: " + config.num_grid.derivative);
+  }
+
+  if (config.num_grid.divergence_correction == 1) {
+    double* min_geom_size = std::min_element(grid.geom_size.begin(), grid.geom_size.end());
+    double* max_geom_size = std::max_element(grid.geom_size.begin(), grid.geom_size.end());
+    for (int i = 0; i < 3; ++i) {
+      if (i != std::distance(grid.geom_size.begin(), min_geom_size) && 
+          i != std::distance(grid.geom_size.begin(), max_geom_size)) {
+        for (int j = 0; j < 3; ++j)
+          grid.scaled_geom_size[j] = grid.geom_size[j] / grid.geom_size[i];
+      }
+    }
+  } else if (config.num_grid.divergence_correction == 2) {
+      std::array<double, 3> normalized_geom_size = {grid.geom_size[0]/grid.cells[0], grid.geom_size[1]/grid.cells[1], grid.geom_size[2]/grid.cells[2]};
+      double* min_normalized_geom_size = std::min_element(normalized_geom_size.begin(), normalized_geom_size.end());
+      double* max_normalized_geom_size = std::max_element(normalized_geom_size.begin(), normalized_geom_size.end());
+      for (int i = 0; i < 3; ++i) {
+        if (i != std::distance(grid.geom_size.begin(), min_normalized_geom_size) && 
+            i != std::distance(grid.geom_size.begin(), max_normalized_geom_size)) {
+          for (int j = 0; j < 3; ++j)
+            grid.scaled_geom_size[j] = grid.geom_size[j] / grid.geom_size[i] * grid.cells[i];
+        }
+      }
+  } else {
+      grid.scaled_geom_size = grid.geom_size;
+  }
+
     //get num vairables 177-210
-    spectral_derivative_ID = DERIVATIVE_CONTINUOUS_ID;
-    double scaled_geom_size[3] = {grid.geom_size[0], grid.geom_size[1], grid.geom_size[2]};
-    int fftw_planner_flag = FFTW_MEASURE;
-    //  call fftw_set_timelimit(num_grid%get_asFloat('fftw_timelimit',defaultVal=300.0_pReal)) 229
-    fftw_set_timelimit(300.0);
-    std::cout << "\n FFTW initialized" << std::endl;
+  spectral_derivative_ID = DERIVATIVE_CONTINUOUS_ID;
+  double scaled_geom_size[3] = {grid.geom_size[0], grid.geom_size[1], grid.geom_size[2]};
+  int fftw_planner_flag = FFTW_MEASURE;
+  //  call fftw_set_timelimit(num_grid%get_asFloat('fftw_timelimit',defaultVal=300.0_pReal)) 229
+  fftw_set_timelimit(300.0);
+  std::cout << "\n FFTW initialized" << std::endl;
 
   std::array<ptrdiff_t, 3> cells_fftw = {grid.cells[0], grid.cells[1], grid.cells[2]};
 
@@ -62,8 +98,6 @@ void Spectral::init(){
               fftw_planner_flag, plan_scalar_forth, plan_scalar_back,
               "scalar");
 
-  // std::cout << "hhe 3 " << grid.cells0_reduced << " " << grid.cells[2] << " " <<  grid.cells1_tensor << std::endl;
-  // exit(0);
   xi1st.resize(3, grid.cells0_reduced, grid.cells[2], grid.cells1_tensor);
     xi1st.setConstant(std::complex<double>(0,0));
   xi2nd.resize(3, grid.cells0_reduced, grid.cells[2], grid.cells1_tensor);
@@ -71,38 +105,36 @@ void Spectral::init(){
 
   std::array<int, 3> k_s;
   std::array<std::complex<double>, 3> freq_derivative;
-  // use lambda function for get_freq_derivative
-    std::array<int, 3>  loop_indices;
+  std::array<int, 3>  loop_indices;
   for (int j = grid.cells1_offset_tensor; j < grid.cells1_offset_tensor + grid.cells1_tensor; ++j) {
-        k_s[1] = j;
-        if (j > grid.cells[1] / 2) k_s[1] = k_s[1] - grid.cells[1];
-        for (int k = 0; k < grid.cells[2]; ++k) {
-            k_s[2] = k;
-            if (k > grid.cells[2] / 2) k_s[2] = k_s[2] - grid.cells[2];
-      for (int i = 0; i < grid.cells0_reduced; ++i) {
-                k_s[0] = i;
-                freq_derivative = get_freq_derivative(k_s);
-        for (int p = 0; p < 3; ++p) xi2nd(p, i, k, j-grid.cells1_offset_tensor) = freq_derivative[p];
-                loop_indices = {i,j,k};
-                for (int p = 0; p < 3; ++p) {
-                    if (grid.cells[p] == loop_indices[p]+1){
-            xi1st(p, i, k, j - grid.cells1_offset_tensor) = std::complex<double>(0.0, 0.0);
-                    } else {
-                        for (int p = 0; p < 3; ++p) {
+    k_s[1] = j;
+    if (j > grid.cells[1] / 2) k_s[1] = k_s[1] - grid.cells[1];
+    for (int k = 0; k < grid.cells[2]; ++k) {
+      k_s[2] = k;
+      if (k > grid.cells[2] / 2) k_s[2] = k_s[2] - grid.cells[2];
+    for (int i = 0; i < grid.cells0_reduced; ++i) {
+      k_s[0] = i;
+      freq_derivative = get_freq_derivative(k_s);
+      for (int p = 0; p < 3; ++p) xi2nd(p, i, k, j-grid.cells1_offset_tensor) = freq_derivative[p];
+        loop_indices = {i,j,k};
+        for (int p = 0; p < 3; ++p) {
+          if (grid.cells[p] == loop_indices[p]+1){
+          xi1st(p, i, k, j - grid.cells1_offset_tensor) = std::complex<double>(0.0, 0.0);
+          } else {
+            for (int p = 0; p < 3; ++p) {
               xi1st(p, i, k, j-grid.cells1_offset_tensor) = xi2nd(p, i, k, j - grid.cells1_offset_tensor);
-                        }
-                    }
-                }
             }
+          }
         }
+      }
     }
-    // if (num.memory_efficient) {
-    //     gamma_hat.resize(3, 3, 3, 3, 1, 1, 1);
-    // } else {
-    //     gamma_hat.resize(3, 3, 3, 3, cells1Red, cells[2], cells2);
-    // }
-  gamma_hat.resize(3,3,3,3,grid.cells0_reduced,grid.cells[2],grid.cells1_tensor);
-    gamma_hat.setZero();
+  }
+  if (config.num_grid.memory_efficient) {
+    gamma_hat.resize(3, 3, 3, 3, 1, 1, 1);
+  } else {
+    gamma_hat.resize(3,3,3,3,grid.cells0_reduced,grid.cells[2],grid.cells1_tensor);
+      gamma_hat.setZero();
+  }
 }
 
 template <int Rank>
@@ -137,16 +169,16 @@ void Spectral::set_up_fftw (ptrdiff_t& cells1_fftw,
       dims_real = create_dimensions({3, 3, grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
       dims_fourier = create_dimensions({3, 3, grid.cells0_reduced, grid.cells[2], cells1_fftw});
     } else {
-       if (cells1_fftw != grid.cells1_tensor) throw std::runtime_error("domain decomposition mismatch ("+ label +", Fourier space)");
-       if (label == "vector") {
-         dims_real = create_dimensions({3, grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
-         dims_fourier = create_dimensions({3, grid.cells0_reduced, grid.cells[2], cells1_fftw});
-       } else if (label == "scalar") {
-         dims_real = create_dimensions({grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
-         dims_fourier = create_dimensions({grid.cells0_reduced, grid.cells[2], cells1_fftw});
-       } else {
-           throw std::runtime_error("Invalid label");
-       }
+      if (cells1_fftw != grid.cells1_tensor) throw std::runtime_error("domain decomposition mismatch ("+ label +", Fourier space)");
+      if (label == "vector") {
+        dims_real = create_dimensions({3, grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
+        dims_fourier = create_dimensions({3, grid.cells0_reduced, grid.cells[2], cells1_fftw});
+      } else if (label == "scalar") {
+        dims_real = create_dimensions({grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
+        dims_fourier = create_dimensions({grid.cells0_reduced, grid.cells[2], cells1_fftw});
+      } else {
+        throw std::runtime_error("Invalid label");
+      }
     } 
     field_real.reset(new Eigen::TensorMap<Eigen::Tensor<double, Rank>>(reinterpret_cast<double*>(field_fourier_fftw), dims_real));
     field_fourier.reset(new Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>(reinterpret_cast<std::complex<double>*>(field_fourier_fftw), dims_fourier));
@@ -372,47 +404,49 @@ void Spectral::constitutive_response(Eigen::Tensor<double, 5> &P,
 
 void Spectral::update_gamma(Eigen::Tensor<double, 4> &C) {
   C_ref = C / wgt;
-  gamma_hat.setConstant(std::complex<double>(0.0, 0.0));
-  for (int j = grid.cells1_offset_tensor; j < grid.cells1_offset_tensor + grid.cells1_tensor; ++j) {
-    for (int k = 0; k < grid.cells[2]; ++k) {
-      for (int i = 0; i < grid.cells0_reduced; ++i) {
-        if (i != 0 || j != 0 || k != 0) {
-          Eigen::Matrix<std::complex<double>, 3, 3> xiDyad_cmplx;
-          Eigen::TensorMap<Eigen::Tensor<const std::complex<double>, 2>> xiDyad_cmplx_map(xiDyad_cmplx.data(), 3, 3);
-          Eigen::Matrix<std::complex<double>, 3, 3> temp33_cmplx;
-          for (int l = 0; l < 3; ++l) {
-              for (int m = 0; m < 3; ++m) {
-                xiDyad_cmplx(l, m) = std::conj(-xi1st(l, i, k, j - grid.cells1_offset_tensor)) * xi1st(m, i, k, j - grid.cells1_offset_tensor);
-              }
-          }
-          for (int l = 0; l < 3; ++l) {
-              for (int m = 0; m < 3; ++m) {
-                  temp33_cmplx(l, m) = 0; // use loops instead of contraction because of missing Tensor-Matrix interoperability in Eigen
-                  for (int n = 0; n < 3; ++n) {
-                      for (int o = 0; o < 3; ++o) {
-                          temp33_cmplx(l, m) += std::complex<double>(C_ref(l, n, m, o), 0) * xiDyad_cmplx(n, o);
-                      }
-                  }
-              }   
-          }
-          Eigen::Matrix<double, 6, 6> A;
-          A.block<3, 3>(0, 0) = temp33_cmplx.real(); 
-          A.block<3, 3>(3, 3) = temp33_cmplx.real();
-          A.block<3, 3>(0, 3) = temp33_cmplx.imag(); 
-          A.block<3, 3>(3, 0) = -temp33_cmplx.imag();
-          if (std::abs(A.block<3, 3>(0, 0).determinant()) > 1e-16) {
-            Eigen::Matrix<double, 6, 6> A_inv;
-            A_inv = A.inverse();
-            for (int i = 0; i < 3; ++i) {
-              for (int j = 0; j < 3; ++j) {
-                temp33_cmplx(i, j) = std::complex<double>(A_inv(i, j), A_inv(i + 3, j));
-              }
+  if (!config.num_grid.memory_efficient){
+    gamma_hat.setConstant(std::complex<double>(0.0, 0.0));
+    for (int j = grid.cells1_offset_tensor; j < grid.cells1_offset_tensor + grid.cells1_tensor; ++j) {
+      for (int k = 0; k < grid.cells[2]; ++k) {
+        for (int i = 0; i < grid.cells0_reduced; ++i) {
+          if (i != 0 || j != 0 || k != 0) {
+            Eigen::Matrix<std::complex<double>, 3, 3> xiDyad_cmplx;
+            Eigen::TensorMap<Eigen::Tensor<const std::complex<double>, 2>> xiDyad_cmplx_map(xiDyad_cmplx.data(), 3, 3);
+            Eigen::Matrix<std::complex<double>, 3, 3> temp33_cmplx;
+            for (int l = 0; l < 3; ++l) {
+                for (int m = 0; m < 3; ++m) {
+                  xiDyad_cmplx(l, m) = std::conj(-xi1st(l, i, k, j - grid.cells1_offset_tensor)) * xi1st(m, i, k, j - grid.cells1_offset_tensor);
+                }
             }
-            for (int m = 0; m < 3; ++m) {
-              for (int n = 0; n < 3; ++n) {
-                  for (int o = 0; o < 3; ++o) {
-              for (int l = 0; l < 3; ++l) 
-                gamma_hat(l, m, n, o, i, k, j - grid.cells1_offset_tensor) = temp33_cmplx(l, n) * xiDyad_cmplx(o, m);
+            for (int l = 0; l < 3; ++l) {
+                for (int m = 0; m < 3; ++m) {
+                    temp33_cmplx(l, m) = 0; // use loops instead of contraction because of missing Tensor-Matrix interoperability in Eigen
+                    for (int n = 0; n < 3; ++n) {
+                        for (int o = 0; o < 3; ++o) {
+                            temp33_cmplx(l, m) += std::complex<double>(C_ref(l, n, m, o), 0) * xiDyad_cmplx(n, o);
+                        }
+                    }
+                }   
+            }
+            Eigen::Matrix<double, 6, 6> A;
+            A.block<3, 3>(0, 0) = temp33_cmplx.real(); 
+            A.block<3, 3>(3, 3) = temp33_cmplx.real();
+            A.block<3, 3>(0, 3) = temp33_cmplx.imag(); 
+            A.block<3, 3>(3, 0) = -temp33_cmplx.imag();
+            if (std::abs(A.block<3, 3>(0, 0).determinant()) > 1e-16) {
+              Eigen::Matrix<double, 6, 6> A_inv;
+              A_inv = A.inverse();
+              for (int i = 0; i < 3; ++i) {
+                for (int j = 0; j < 3; ++j) {
+                  temp33_cmplx(i, j) = std::complex<double>(A_inv(i, j), A_inv(i + 3, j));
+                }
+              }
+              for (int m = 0; m < 3; ++m) {
+                for (int n = 0; n < 3; ++n) {
+                    for (int o = 0; o < 3; ++o) {
+                for (int l = 0; l < 3; ++l) 
+                  gamma_hat(l, m, n, o, i, k, j - grid.cells1_offset_tensor) = temp33_cmplx(l, n) * xiDyad_cmplx(o, m);
+                  }
                 }
               }
             }
