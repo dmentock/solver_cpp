@@ -66,13 +66,13 @@ void print_map(const std::string& label, const Eigen::TensorMap<Eigen::Tensor<T,
 }
 
 template <typename TensorType>
-void cat_print_recursive(const TensorType* tensor, const std::vector<int>& indices, int current_index) {
+void cat_print_recursive(const TensorType& tensor, const std::vector<int>& indices, int current_index) {
     if (current_index == indices.size()) {
-        std::cout << std::setprecision(17) <<  tensor->coeff(indices) << std::endl;
+        std::cout << std::setprecision(17) <<  tensor.coeff(indices) << std::endl;
         return;
     }
 
-    for (int i = 0; i < tensor->dimension(current_index); ++i) {
+    for (int i = 0; i < tensor.dimension(current_index); ++i) {
         std::vector<int> new_indices = indices;
         new_indices[current_index] = i;
         cat_print_recursive(tensor, new_indices, current_index + 1);
@@ -80,16 +80,16 @@ void cat_print_recursive(const TensorType* tensor, const std::vector<int>& indic
 }
 
 template <typename TensorType>
-void cat_print(const TensorType* tensor, const std::string& label = "") {
+void cat_print(const std::string& label, const TensorType& tensor) {
     std::cout << std::endl << "cat-printing tensor " << label << ", dims (";
-    for (int i = 0; i < tensor->dimensions().size(); ++i) {
-        std::cout << tensor->dimensions()[i];
-        if (i < tensor->dimensions().size() - 1) {
+    for (int i = 0; i < tensor.dimensions().size(); ++i) {
+        std::cout << tensor.dimensions()[i];
+        if (i < tensor.dimensions().size() - 1) {
             std::cout << ", ";
         }
     }
     std::cout << ")" << std::endl;
-    std::vector<int> indices(tensor->dimensions().size(), 0);
+    std::vector<int> indices(tensor.dimensions().size(), 0);
     cat_print_recursive(tensor, indices, 0);
 }
 

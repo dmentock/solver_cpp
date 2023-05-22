@@ -1,9 +1,10 @@
 import damask
 import numpy as np
-size = np.ones(3)*1e-5
-size[0] *=2
 
-cells = [2,1,1]
+
+cells = [1,2,1]
+size = np.array(cells)*1e-5
+
 N_grains = 2
 seeds = damask.seeds.from_random(size,N_grains,cells)
 grid = damask.Grid.from_Voronoi_tessellation(cells,size,seeds)

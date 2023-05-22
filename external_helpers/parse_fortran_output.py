@@ -4,12 +4,6 @@ import os
 cat = True
 indent = 2
 
-max_len = len('-7.155234002973046e-17')
-x = -7.155234002973046e-17
-
-
-max_len-len(f'{abs(x):.16g}')
-
 def generate_cpp_tensor_def(item):
     vals = item.split('vals:')[-1]
     type = 'complex' if '(' in vals else 'double'

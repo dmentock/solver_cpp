@@ -9,16 +9,16 @@ def format_nested_array(numbers_str, dimensions, cat=False):
     nl = '\n'
     numbers_array = np.array(numbers)
     reshaped_array = np.reshape(numbers_array, dimensions, order='F')
-    max_len = (max([len(str(i)) for i in np.ravel(numbers_array)]) if not is_complex else \
-              max(max(len(str(i.real)), len(str(i.imag))) for i in np.ravel(numbers_array)))
+    max_len = (max([len(f'{i.real:.17g}') for i in np.ravel(numbers_array)]) if not is_complex else \
+              max(max(len(f'{i.real:.17g}'), len(f'{i.imag:.17g}')) for i in np.ravel(numbers_array)))
     def format_array(arr, level, max_len, inner_first=False):
         indent = ' '+' '*level
         if level == len(dimensions) - 1:
             inner_str = []
             for x in arr:
-                val = (f"c({'' if x.real<0 else ' '}{x.real:.16g}{' '*(max_len-len(f'{abs(x.real):.16g}')-1)}, "
-                         f"{'' if x.imag<0 else ' '}{x.imag:.16g}{' '*(max_len-len(f'{abs(x.imag):.16g}')-1)})") if is_complex else \
-                      f"{'' if x<0 else ' '}{x:.16g}{' '*(max_len-len(f'{abs(x):.16g}')-1)}"
+                val = (f"c({'' if x.real<0 else ' '}{x.real:.17g}{' '*(max_len-len(f'{abs(x.real):.17g}')-1)}, "
+                         f"{'' if x.imag<0 else ' '}{x.imag:.17g}{' '*(max_len-len(f'{abs(x.imag):.17g}')-1)})") if is_complex else \
+                      f"{'' if x<0 else ' '}{x:.17g}{' '*(max_len-len(f'{abs(x):.17g}')-1)}"
                 inner_str.append(val)
             return f'{{ {", ".join(inner_str)} }}'
         else:

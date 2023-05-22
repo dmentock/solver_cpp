@@ -6,6 +6,7 @@
 #include <random>
 #include <cmath>
 #include <limits>
+#include <iomanip> 
 
 template <typename T, int N>
 bool tensor_eq(const Eigen::Tensor<T, N>& tensor1, const Eigen::Tensor<T, N>& tensor2, double epsilon = 1e-8) {
@@ -62,3 +63,24 @@ auto tensor_sum(const TensorType& tensor) -> typename TensorType::Scalar {
   }
   return sum;
 }
+
+template <typename MatrixType>
+auto matrix_sum(const MatrixType& mat) -> typename MatrixType::Scalar {
+  using T = typename MatrixType::Scalar;
+  T sum = 0;
+  for (int i = 0; i < mat.size(); ++i) {
+    sum += mat.data()[i]; // for double data type
+  }
+  return sum;
+}
+
+
+// template <typename TensorType>
+// bool assert_tensor_eq(const TensorType& tensor, TensorType val) {
+//   using T = typename TensorType::Scalar;
+//   T sum = 0;
+//   for (int i = 0; i < tensor.size(); ++i) {
+//     if 
+//   }
+//   return sum;
+// }
