@@ -1,4 +1,4 @@
-#include "spectral/fields/mech.h"
+#include "spectral/mech/utilities.h"
 #include "helper.h"
 
 #include <mpi.h>
@@ -17,7 +17,7 @@
 #include <algorithm>
 #include <cmath>
 
-void Mech::init_mech(){
+void Utilities::init_utilities(){
   std::cout << "\n <<<+-  spectral mech init  -+>>>" << std::endl;
 
   if (config.num_grid.divergence_correction == 1) {
@@ -53,7 +53,7 @@ void Mech::init_mech(){
   }
 }
 
-void Mech::update_coords(Eigen::Tensor<double, 5> &F, Eigen::Tensor<double, 2>& x_n_, Eigen::Tensor<double, 2>& x_p_) {
+void Utilities::update_coords(Eigen::Tensor<double, 5> &F, Eigen::Tensor<double, 2>& x_n_, Eigen::Tensor<double, 2>& x_p_) {
   spectral.tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
       Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2})).device(Eigen::DefaultDevice{}) = F;
   spectral.tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}),
@@ -175,7 +175,7 @@ void Mech::update_coords(Eigen::Tensor<double, 5> &F, Eigen::Tensor<double, 2>& 
   }
 }
 
-// void Mech::constitutive_response(Eigen::Tensor<double, 5> &P, 
+// void Utilities::constitutive_response(Eigen::Tensor<double, 5> &P, 
 //                                      Eigen::Tensor<double, 2> &P_av, 
 //                                      Eigen::Tensor<double, 4> &C_volAvg, 
 //                                      Eigen::Tensor<double, 4> &C_minMaxAvg,
@@ -227,7 +227,7 @@ void Mech::update_coords(Eigen::Tensor<double, 5> &F, Eigen::Tensor<double, 2>& 
 // //   MPI_Allreduce(MPI_IN_PLACE, C_volAvg.data(), 81, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD)
 // }
 
-void Mech::update_gamma(Eigen::Tensor<double, 4> &C) {
+void Utilities::update_gamma(Eigen::Tensor<double, 4> &C) {
   C_ref = C / spectral.wgt;
   if (!config.num_grid.memory_efficient){
     gamma_hat.setConstant(std::complex<double>(0.0, 0.0));
@@ -283,7 +283,7 @@ void Mech::update_gamma(Eigen::Tensor<double, 4> &C) {
   }
 }
 
-void Mech::forward_field(double delta_t, 
+void Utilities::forward_field(double delta_t, 
                             Eigen::Tensor<double, 5> &field_last_inc, 
                             Eigen::Tensor<double, 5> &rate, 
                             Eigen::Tensor<double, 5> &forwarded_field,
@@ -321,7 +321,7 @@ void Mech::forward_field(double delta_t,
   }
 }
 
-void Mech::calculate_masked_compliance( Eigen::Tensor<double, 4> &C,
+void Utilities::calculate_masked_compliance( Eigen::Tensor<double, 4> &C,
                                             std::array<double, 4> &rot_bc_q,
                                             const Eigen::Matrix<bool, 3, 3> &mask_stress,
                                             Eigen::Tensor<double, 4> &masked_compliance) {
@@ -380,7 +380,7 @@ void Mech::calculate_masked_compliance( Eigen::Tensor<double, 4> &C,
   f_math_99to3333(temp99_real.data(), masked_compliance.data());
 }
 
-double Mech::calculate_divergence_rms(const Eigen::Tensor<double, 5>& tensor_field) {
+double Utilities::calculate_divergence_rms(const Eigen::Tensor<double, 5>& tensor_field) {
 
   spectral.tensorField_real->slice(
     Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}), 
@@ -445,7 +445,7 @@ double Mech::calculate_divergence_rms(const Eigen::Tensor<double, 5>& tensor_fie
   return rms;
 }
 
-Eigen::Tensor<double, 5> Mech::gamma_convolution(Eigen::Tensor<double, 5> &field, Eigen::Tensor<double, 2> &field_aim){
+Eigen::Tensor<double, 5> Utilities::gamma_convolution(Eigen::Tensor<double, 5> &field, Eigen::Tensor<double, 2> &field_aim){
 
   spectral.tensorField_real->slice(
     Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}), 
@@ -533,7 +533,7 @@ Eigen::Tensor<double, 5> Mech::gamma_convolution(Eigen::Tensor<double, 5> &field
 
 
 
-// Eigen::Tensor<double, 4> Mech::calculate_scalar_gradient(const Eigen::Tensor<double, 3>& field) {
+// Eigen::Tensor<double, 4> Utilities::calculate_scalar_gradient(const Eigen::Tensor<double, 3>& field) {
 //     std::cout << "calling calculate_scalar_gradient" << std::endl;
 
 //     Eigen::Tensor<double, 4> grad(3, grid.cells[0], grid.cells[1], grid.cells2);

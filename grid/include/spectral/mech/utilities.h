@@ -1,5 +1,5 @@
-#ifndef MECH_H
-#define MECH_H
+#ifndef UTILITIES_H
+#define UTILITIES_H
 
 #include <vector>
 #include <array>
@@ -17,13 +17,13 @@ extern "C" {
   void f_math_99to3333(double* m99, double* m3333);
 }
 
-class Mech {
+class Utilities {
 public:
-  Mech(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
+  Utilities(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
       : config(config_), grid(grid_), spectral(spectral_) {}
 
 
-  void init_mech();
+  void init_utilities();
   virtual void update_coords (Eigen::Tensor<double, 5> &F, 
                               Eigen::Tensor<double, 2>& reshaped_x_n, 
                               Eigen::Tensor<double, 2>& reshaped_x_p);
@@ -55,4 +55,4 @@ protected:
   DiscretizationGrid& grid;
   Config& config;
 };
-#endif // MECH_H
+#endif // UTILITIES_H

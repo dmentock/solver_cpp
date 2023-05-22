@@ -12,9 +12,9 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 
 #include "spectral/spectral.h"
-#include "spectral/solver/basic.h"
+#include "spectral/mech/basic.h"
 
-void SolverBasic::init() {
+void MechBasic::init() {
   std::cout << "\n <<<+-  grid_mechanical_spectral_basic init  -+>>>\n";
   std::cout << "P. Eisenlohr et al., International Journal of Plasticity 46:37–53, 2013\n";
   std::cout << "https://doi.org/10.1016/j.ijplas.2012.09.012\n\n";
@@ -96,7 +96,7 @@ void SolverBasic::init() {
   C_minMaxAvgRestart = C_minMaxAvg;
 }
 
-PetscErrorCode SolverBasic::converged (SNES snes_local,
+PetscErrorCode MechBasic::converged (SNES snes_local,
                           PetscInt PETScIter,
                           PetscReal devNull1,
                           PetscReal devNull2,
@@ -127,7 +127,7 @@ PetscErrorCode SolverBasic::converged (SNES snes_local,
     // std::cout.flush();
     // err_PETSc = 0;
 }
-PetscErrorCode SolverBasic::formResidual (DMDALocalInfo *residual_subdomain,
+PetscErrorCode MechBasic::formResidual (DMDALocalInfo *residual_subdomain,
                                         void *F_void,
                                         void *r_void,
                                         void *dummy)

@@ -31,20 +31,20 @@ target_link_libraries(test_spectral
                       GTest::Main 
                       gmock gmock_main)
                       
-add_executable(test_spectral_fields_mech test_spectral_fields_mech.cpp)
-target_link_libraries(test_spectral_fields_mech 
+add_executable(test_spectral_mech_utilities test_spectral_mech_utilities.cpp)
+target_link_libraries(test_spectral_mech_utilities 
                       ${PETSC_ARCH_DIR}/lib/libpetsc.so
-                      spectral_fields_mech
+                      spectral_mech_utilities
                       spectral
                       discretization_grid
                       GTest::GTest 
                       GTest::Main 
                       gmock gmock_main)
 
-add_executable(test_spectral_solver_basic test_spectral_solver_basic.cpp)
-target_link_libraries(test_spectral_solver_basic 
+add_executable(test_spectral_mech_basic test_spectral_mech_basic.cpp)
+target_link_libraries(test_spectral_mech_basic 
                       PUBLIC
-                      spectral_solver_basic 
+                      spectral_mech_basic 
                       ${PETSC_ARCH_DIR}/lib/libpetsc.so
                       GTest::GTest 
                       GTest::Main 

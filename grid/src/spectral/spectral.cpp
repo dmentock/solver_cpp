@@ -33,10 +33,7 @@ void Spectral::init(){
   grid.cells0_reduced = grid.cells[0] / 2 + 1;
   wgt = std::pow(grid.cells[0] * grid.cells[1] * grid.cells[2], -1);
 
-
-
-
-    //get num vairables 177-210
+  //get num vairables 177-210
   double scaled_geom_size[3] = {grid.geom_size[0], grid.geom_size[1], grid.geom_size[2]};
   int fftw_planner_flag = FFTW_MEASURE;
   //  call fftw_set_timelimit(num_grid%get_asFloat('fftw_timelimit',defaultVal=300.0_pReal)) 229

@@ -17,8 +17,8 @@ target_link_libraries(spectral
                       ${PETSC_ARCH_DIR}/lib/libmpi.a
                       -lfftw3)
 
-add_library(spectral_fields_mech spectral/fields/mech.cpp)
-target_link_libraries(spectral_fields_mech 
+add_library(spectral_mech_utilities spectral/mech/utilities.cpp)
+target_link_libraries(spectral_mech_utilities 
                       spectral
                       discretization_grid
                       config
@@ -29,7 +29,7 @@ target_link_libraries(spectral_fields_mech
                       ${PETSC_ARCH_DIR}/lib/libmpi.a
                       -lfftw3)
 
-add_library(spectral_solver_basic spectral/solver/basic.cpp)
-target_link_libraries(spectral_solver_basic 
+add_library(spectral_mech_basic spectral/mech/basic.cpp)
+target_link_libraries(spectral_mech_basic 
                       PUBLIC
-                      spectral_fields_mech)
+                      spectral_mech_utilities)

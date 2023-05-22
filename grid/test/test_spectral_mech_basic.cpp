@@ -9,8 +9,9 @@
 #include <petsc.h>
 #include <unsupported/Eigen/CXX11/Tensor>
 
-#include "spectral/solver/basic.h"
 #include "simple_grid_setup.hpp"
+
+#include "spectral/mech/basic.h"
 
 
 class PetscMpiEnv : public ::testing::Environment {
@@ -29,10 +30,10 @@ public:
   }
 };
 
-class PartialMockSolverBasic : public SolverBasic {
+class PartialMockMechBasic : public MechBasic {
 public:
-  PartialMockSolverBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
-      : SolverBasic(config_, grid_, spectral_) {};
+  PartialMockMechBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
+      : MechBasic(config_, grid_, spectral_) {};
 
   using Tensor2 = Eigen::Tensor<double, 2>;
   using Tensor4 = Eigen::Tensor<double, 4>;
@@ -41,12 +42,19 @@ public:
   MOCK_METHOD(void, update_gamma, (Tensor4&), (override));
 };
 
-TEST_F(SimpleGridSetup, TestSolverBasicInit) {
+TEST_F(SimpleGridSetup, TestMechBasicInit) {
   init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
-  PartialMockSolverBasic solver_basic(config, *mock_grid, spectral);
-  solver_basic.init();
+  PartialMockMechBasic mech_basic(config, *mock_grid, spectral);
+  mech_basic.init();
 }
+
+// TEST_F(SimpleGridSetup, TestSpectralMechBasicInitFull) {
+//   init_grid(std::array<int, 3>{2,1,1});
+//   Basic spectral_basic(*mock_grid);
+//   spectral_basic.init();
+//   spectral_basic.init_basic();
+// }
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
