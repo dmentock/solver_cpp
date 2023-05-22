@@ -73,7 +73,7 @@ void MechBasic::init() {
 
   DMDAVecGetArray(da, solution_vec, &F_data); //moved down because its recommended to do this on already initialized arrays
 
-  Eigen::Tensor<double, 3> homogenization_F0(3, 3, grid.cells[0] * grid.cells[1] * grid.cells[2]);
+  homogenization_F0.resize(3, 3, grid.cells[0] * grid.cells[1] * grid.cells[2]);
   homogenization_F0 = F_lastInc.reshape(Eigen::array<int, 3>({3, 3, grid.cells[0] * grid.cells[1] * grid.cells[2]}));
 
   Eigen::Tensor<double, 2> x_n(3, 12);

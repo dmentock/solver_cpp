@@ -7,16 +7,6 @@ class MechBasic : public Utilities {
 public:
   MechBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
       : Utilities(config_, grid_, spectral_) {}
-  Eigen::Tensor<double, 2> P_av;
-  Eigen::Tensor<double, 4> C_volAvg;
-  Eigen::Tensor<double, 4> C_volAvgLastInc;
-  Eigen::Tensor<double, 4> C_minMaxAvg;
-  Eigen::Tensor<double, 4> C_minMaxAvgLastInc;
-  Eigen::Tensor<double, 4> C_minMaxAvgRestart;
-
-  Eigen::Tensor<double, 5> F_lastInc;
-  Eigen::Tensor<double, 5> F_dot;
-
   void init();
   static PetscErrorCode formResidual (DMDALocalInfo* residual_subdomain,
                                       void* F,
@@ -29,5 +19,17 @@ public:
                                   PetscReal  devNull3,
                                   SNESConvergedReason* reason, 
                                   void* ctx);
+
+  Eigen::Tensor<double, 2> P_av;
+  Eigen::Tensor<double, 4> C_volAvg;
+  Eigen::Tensor<double, 4> C_volAvgLastInc;
+  Eigen::Tensor<double, 4> C_minMaxAvg;
+  Eigen::Tensor<double, 4> C_minMaxAvgLastInc;
+  Eigen::Tensor<double, 4> C_minMaxAvgRestart;
+
+  Eigen::Tensor<double, 5> F_lastInc;
+  Eigen::Tensor<double, 5> F_dot;
+
+  Eigen::Tensor<double, 3> homogenization_F0;
 };
 #endif // MECH_BASIC_H
