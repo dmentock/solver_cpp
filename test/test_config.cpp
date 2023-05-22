@@ -4,10 +4,8 @@
 #include <fstream> 
 #include <stdexcept>
 
-#include "yaml_reader.h"
+#include "config.h"
 #include "helper.h"
-
-
 
 class NumYamlSetup : public ::testing::Test {
  protected:
@@ -28,7 +26,8 @@ class NumYamlSetup : public ::testing::Test {
 };
 
 TEST_F(NumYamlSetup, TestYamlReadSuccess) {
-  write_to_file(R""""(grid:
+  write_to_file(R""""(
+grid:
   itmin: 2
   itmax: 5
   eps_div_rtol: 1.23
@@ -36,7 +35,7 @@ TEST_F(NumYamlSetup, TestYamlReadSuccess) {
   update_gamma: true
   )"""");
 
-  YamlReader config;
+  Config config;
 
   config.parse_num_grid_yaml(numerics_path);
   ASSERT_EQ(config.num_grid.itmin, 2);
@@ -47,13 +46,14 @@ TEST_F(NumYamlSetup, TestYamlReadSuccess) {
 }
 
 TEST_F(NumYamlSetup, TestYamlReadInvalidIntValue) {
-  write_to_file(R""""(grid:
+  write_to_file(R""""(
+grid:
   itmin: 0
   itmax: 1
   divergence_correction: 3
   eps_div_atol: 0
   )"""");
-  YamlReader config;
+  Config config;
   try {
     config.parse_num_grid_yaml(numerics_path);
   } catch (const std::runtime_error& e) {
@@ -67,10 +67,11 @@ eps_div_atol must be > 0
 }
 
 TEST_F(NumYamlSetup, TestYamlReadIntBoolMismatch) {
-  write_to_file(R""""(grid:
+  write_to_file(R""""(
+grid:
   itmin: true
   )"""");
-  YamlReader config;
+  Config config;
   try {
     config.parse_num_grid_yaml(numerics_path);
   } catch (const std::exception& e) {

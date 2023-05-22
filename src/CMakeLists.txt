@@ -28,5 +28,5 @@ target_link_libraries(f_rotations
 
 add_library(discretization discretization.cpp)
 
-add_library(yaml_reader yaml_reader.cpp)
-target_link_libraries(yaml_reader yaml-cpp)
+add_library(config config.cpp)
+target_link_libraries(config yaml-cpp)

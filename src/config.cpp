@@ -3,14 +3,14 @@
 #include <sstream>
 #include <yaml-cpp/yaml.h>
 
-#include <yaml_reader.h>
+#include <config.h>
 
 std::string readFileContent(const std::string& filePath) {
 	std::ifstream inFile(filePath);
 	std::stringstream buffer;
 	buffer << inFile.rdbuf();
 	return buffer.str();
-}
+};
 
 // std::string yamlNodeToString(const YAML::Node& node) {
 //     YAML::Emitter out;
@@ -33,7 +33,7 @@ std::string readFileContent(const std::string& filePath) {
 
 
 
-void YamlReader::parse_num_grid_yaml(std::string yamlFilePath) {
+void Config::parse_num_grid_yaml(std::string yamlFilePath) {
 	std::string yamlContent = readFileContent(yamlFilePath);
 
 	YAML::Node rootNode = YAML::Load(yamlContent);
@@ -161,11 +161,15 @@ void YamlReader::parse_num_grid_yaml(std::string yamlFilePath) {
 				num_grid.petsc_options = key_.second.as<std::string>();
 		} else if (key == "derivative") {
 				std::string derivative = key_.second.as<std::string>();
-				if (derivative != "continuous" && derivative != "central_difference" && derivative != "FWBW_difference"){ 
-					errors += "derivative must be either 'continuous', 'central_difference' or 'FWBW_difference'\n";
-				} else {
-					num_grid.derivative = derivative;
-				};
+        if (derivative == "continuous") {
+            num_grid.spectral_derivative_id = DERIVATIVE_CONTINUOUS_ID;
+        } else if (derivative == "central_difference") {
+            num_grid.spectral_derivative_id = DERIVATIVE_CENTRAL_DIFF_ID;
+        } else if (derivative == "FWBW_difference") {
+            num_grid.spectral_derivative_id = DERIVATIVE_FWBW_DIFF_ID;
+        } else {
+          errors += "derivative must be either 'continuous', 'central_difference' or 'FWBW_difference'\n";
+        };
 		} else if (key == "fftw_plan_mode") {
 				std::string fftw_plan_mode = key_.second.as<std::string>();
 				if (fftw_plan_mode != "fftw_estimate" && fftw_plan_mode != "fftw_measure" && 
