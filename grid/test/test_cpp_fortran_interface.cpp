@@ -7,16 +7,19 @@
 #include <cstdlib>
 #include <math.h>
 
+#include <tensor_operations.h>
 #include <test/array_matcher.h>
+#include <Eigen/Dense>
+#include <unsupported/Eigen/CXX11/Tensor>
 
 extern "C" {
-void __fortran_testmodule_MOD_fortran_datatypes_test(
+void f_datatypes_test(
   int *int_num,
   double *double_num,
   int *arr1d, 
   int *arr2d, 
-  int *arr3d
-  );
+  int *arr3d);
+  void f_link_global_variable(double* data, int* dims, int* strides);
 }
 class DatatypeTest : public ::testing::Test {};
 TEST_F(DatatypeTest, TestDatatypes) {
@@ -25,7 +28,7 @@ TEST_F(DatatypeTest, TestDatatypes) {
   int arr1d[3];
   int arr2d[3][3];
   int arr3d[3][3][3];
-  __fortran_testmodule_MOD_fortran_datatypes_test(
+  f_datatypes_test(
     &int_num,
     &double_num,
     &arr1d[0],
@@ -50,12 +53,12 @@ TEST_F(DatatypeTest, TestDatatypes) {
 
 // test if calling of fortran functions in real and mocked interfaces works as expected
 extern "C" {
-  int __fortran_testmodule_MOD_fortran_interface_test_func(int* output_val);
+  int f_interface_test_func(int* output_val);
 }
 class FortranFuncInterface {
   public:
     virtual int fortran_interface_test_func(int* output_val) {
-      return __fortran_testmodule_MOD_fortran_interface_test_func(output_val);
+      return f_interface_test_func(output_val);
     }
 };
 class MockFortranFuncInterface : public FortranFuncInterface {
@@ -67,8 +70,7 @@ int testfunc_direct(FortranFuncInterface* func_interface) {
   func_interface->fortran_interface_test_func(&testoutput);
   return testoutput;
 }
-class InterfaceTest : public ::testing::Test {};
-TEST_F(InterfaceTest, FortranFunctionSetsValues) {
+TEST(InterfaceTest, FortranFunctionSetsValues) {
   FortranFuncInterface func_interface;
   MockFortranFuncInterface mock_func_interface;
   ASSERT_EQ(testfunc_direct(&func_interface), 123);
@@ -88,7 +90,7 @@ void testfunc_pointer(MockFortranFuncInterfacePointerArgs* func_interface)
     int testarray[3] = {3,5,7};
     func_interface->fortran_interface_test_func_pointerargs(&testscalar,&testarray[0]);
 }
-TEST_F(InterfaceTest, FortranFunctionIsCalledWithPointerValues)
+TEST(InterfaceTest, FortranFunctionIsCalledWithPointerValues)
 {
     MockFortranFuncInterfacePointerArgs mock_func_interface;
     int expected_scalar = 123;
@@ -98,6 +100,21 @@ TEST_F(InterfaceTest, FortranFunctionIsCalledWithPointerValues)
         ArrayPointee(3, testing::ElementsAreArray(expected_array))
     ));
     testfunc_pointer(&mock_func_interface);
+}
+
+TEST(InterfaceTest, TestGlobalVariableAssignment)
+{
+  Eigen::Tensor<double, 3> tensor(1,2,3);
+  tensor.setZero();
+  tensor(0,0,0) = 1;
+  std::array<int, 3> dims = {tensor.dimension(0), tensor.dimension(1), tensor.dimension(2)};
+  int n_dims = 3;
+  Eigen::Tensor<double, 3> expected_tensor(1,2,3); 
+  expected_tensor.setValues({
+    {{1,2,0}, {0,0,0}}
+  });
+  f_link_global_variable(tensor.data(), dims.data(), &n_dims);
+  tensor_eq(tensor, expected_tensor);
 }
 
 int main(int argc, char **argv) {

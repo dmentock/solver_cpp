@@ -1,12 +1,15 @@
 module fortran_testmodule
+  use iso_c_binding
+  implicit none
+  double precision, pointer :: my_global_ndarray(:,:,:) ! Change according to your need
 
 contains
 
-subroutine fortran_datatypes_test(int_num,&
+subroutine datatypes_test(int_num,&
                             double_num,&
                             arr1d,&
                             arr2d,&
-                            arr3d)
+                            arr3d) bind(C, name="f_datatypes_test")
   use :: ISO_C_BINDING
   integer :: a, b, c
   integer(c_int) :: &
@@ -41,11 +44,30 @@ subroutine fortran_datatypes_test(int_num,&
     end do;
   end do; 
 
-end subroutine fortran_datatypes_test
+end subroutine datatypes_test
 
-subroutine fortran_interface_test_func(output_val)
+subroutine interface_test_func(output_val) bind(C, name="f_interface_test_func")
   integer, intent(out) :: output_val
   output_val = 123
-end subroutine fortran_interface_test_func
+end subroutine interface_test_func
+
+subroutine link_global_variable(c_pointer, dims, n_dims) bind(C, name="f_link_global_variable")
+  type(c_ptr), intent(in), value :: c_pointer
+  integer(c_int), intent(in) :: dims(*)
+  integer(c_int), intent(in) :: n_dims
+  integer, allocatable :: array_shape(:)
+  integer :: i
+  
+  allocate(array_shape(n_dims))
+  do i = 1, n_dims
+    array_shape(i) = dims(i)
+  end do
+  call c_f_pointer(c_pointer, my_global_ndarray, array_shape)
+  if (my_global_ndarray(1,1,1) /= 1) then
+    print *, "wrong array passed to fortran:", my_global_ndarray
+    stop 0
+  end if
+  my_global_ndarray(1,1,2) = 2
+end subroutine link_global_variable
 
 end module fortran_testmodule
