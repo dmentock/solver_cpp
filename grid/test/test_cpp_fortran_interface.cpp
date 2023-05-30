@@ -19,7 +19,9 @@ void f_datatypes_test(
   int *arr1d, 
   int *arr2d, 
   int *arr3d);
-  void f_link_global_variable(double* data, int* dims, int* strides);
+  void f_link_global_tensor(double* data, int* dims, int* strides);
+  void f_link_global_boolean(void** data);
+  void f_verify_bool_modification();
 }
 class DatatypeTest : public ::testing::Test {};
 TEST_F(DatatypeTest, TestDatatypes) {
@@ -102,7 +104,7 @@ TEST(InterfaceTest, FortranFunctionIsCalledWithPointerValues)
     testfunc_pointer(&mock_func_interface);
 }
 
-TEST(InterfaceTest, TestGlobalVariableAssignment)
+TEST(InterfaceTest, TestGlobalTensorAssignment)
 {
   Eigen::Tensor<double, 3> tensor(1,2,3);
   tensor.setZero();
@@ -113,11 +115,22 @@ TEST(InterfaceTest, TestGlobalVariableAssignment)
   expected_tensor.setValues({
     {{1,2,0}, {0,0,0}}
   });
-  f_link_global_variable(tensor.data(), dims.data(), &n_dims);
+  f_link_global_tensor(tensor.data(), dims.data(), &n_dims);
   tensor_eq(tensor, expected_tensor);
 }
 
+TEST(InterfaceTest, TestGlobalBoolAssignment)
+{
+  void* raw_pointer;  // use void* here
+  f_link_global_boolean(&raw_pointer);
+  bool* my_boolean_ptr = static_cast<bool*>(raw_pointer);  // cast to bool*
+  ASSERT_EQ(*my_boolean_ptr, true);
+  *my_boolean_ptr = false;
+  f_verify_bool_modification();
+  ASSERT_EQ(*my_boolean_ptr, true);
+}
+
 int main(int argc, char **argv) {
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+  ::testing::InitGoogleTest(&argc, argv);
+  return RUN_ALL_TESTS();
 }

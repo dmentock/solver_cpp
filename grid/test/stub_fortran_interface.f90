@@ -1,7 +1,9 @@
 module fortran_testmodule
   use iso_c_binding
   implicit none
-  double precision, pointer :: my_global_ndarray(:,:,:) ! Change according to your need
+
+  double precision, pointer :: my_global_ndarray(:,:,:)
+  logical, target :: my_global_boolean = .false.
 
 contains
 
@@ -51,7 +53,7 @@ subroutine interface_test_func(output_val) bind(C, name="f_interface_test_func")
   output_val = 123
 end subroutine interface_test_func
 
-subroutine link_global_variable(c_pointer, dims, n_dims) bind(C, name="f_link_global_variable")
+subroutine link_global_tensor(c_pointer, dims, n_dims) bind(C, name="f_link_global_tensor")
   type(c_ptr), intent(in), value :: c_pointer
   integer(c_int), intent(in) :: dims(*)
   integer(c_int), intent(in) :: n_dims
@@ -68,6 +70,25 @@ subroutine link_global_variable(c_pointer, dims, n_dims) bind(C, name="f_link_gl
     stop 0
   end if
   my_global_ndarray(1,1,2) = 2
-end subroutine link_global_variable
+end subroutine link_global_tensor
+
+subroutine link_global_boolean(c_bool) bind(C, name="f_link_global_boolean")
+  type(c_ptr), intent(out) :: c_bool
+
+  c_bool = c_loc(my_global_boolean)
+  my_global_boolean = .true.
+
+end subroutine link_global_boolean
+
+subroutine verify_bool_modification() bind(C, name="f_verify_bool_modification")
+
+  if (my_global_boolean .neqv. .false.) then
+    print *, "c++ boolean modification failed"
+    stop 0
+  end if
+  my_global_boolean = .true.
+
+end subroutine verify_bool_modification
+
 
 end module fortran_testmodule
