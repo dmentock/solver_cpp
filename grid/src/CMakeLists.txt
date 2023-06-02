@@ -2,6 +2,7 @@ add_library(discretization_grid discretization_grid.cpp)
 target_link_libraries(discretization_grid 
                       PUBLIC
                       discretization
+                      VTI
                       ${MPI_C_LIBRARIES}
                       ${MPI_CXX_LIBRARIES}
                       ${PETSC_ARCH_DIR}/lib/libfftw3_mpi.a

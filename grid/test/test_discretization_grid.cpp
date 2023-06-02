@@ -9,108 +9,129 @@
 #include <fftw3-mpi.h>
 
 #include "discretization_grid.h"
-#include "vti_reader.h"
-class MockDiscretization : public Discretization {
-  public:
-    MOCK_METHOD(void, init, (int*, int*, double*, double*, int), (override));
-};
+
+#include "tensor_operations.h"
+#include "helper.h"
+
 class MockDiscretizationGrid : public DiscretizationGrid {
   public:
-    MockDiscretizationGrid(Discretization& discretization)
-      : DiscretizationGrid(discretization) {
-    }
-    MOCK_METHOD(double*, calculate_nodes0, (int[3], double[3], int), (override));
-    MOCK_METHOD(double*, calculate_ipCoordinates0, (int[3], double[3], int), (override));
+    using Tensor1i = Eigen::Tensor<int, 1>;
+    using Tensor2d = Eigen::Tensor<double, 2>;
+    using array3i = std::array<int, 3>;
+    using array3d = std::array<double, 3>;
+    MOCK_METHOD(void, calculate_nodes0, (Tensor2d&, array3i&, array3d&, int), (override));
+    MOCK_METHOD(void, calculate_ipCoordinates0, (Tensor2d&, array3i&, array3d&, int), (override));
+    MOCK_METHOD(void, VTI_readDataset_int, (Tensor1i& materialAt));
+    MOCK_METHOD(void, discretization_init, (int* materialAt, int n_materialpoints, 
+                                            double* IPcoords0, int n_ips,
+                                            double* NodeCoords0, int n_nodes, 
+                                            int sharedNodesBegin), (override));
+    // MOCK_METHOD(void, discretization_init, (array3i&, array3d&, int), (override));
 };
+
 class DiscretizationGridSetup : public ::testing::Test {
-  protected:
-    //mock vti file output
-    int cells[3] = {2, 3, 4};
-    double geom_size[3] = {1.0, 1.0, 1.0};
-    double origin[3] = {0.0, 0.0, 0.0};
-    int grid_size = 2*3*4;
-    int* grid = new int[grid_size];
   void SetUp() override {
     MPI_Init(NULL, NULL);
-    // fill grid returned by read_vti module with unique ids from 1 to 24 
-    for (int i = 0; i < 2; ++i) {
-      for (int j = 0; j < 3; ++j) {
-          for (int k = 0; k < 4; ++k) {
-              grid[i*3*4+j*4+k] = 1+i*3*4+j*4+k;
-          }
-      }
-    }
   }
   void TearDown() override {
     fftw_mpi_cleanup();
     MPI_Finalize();
   }
 };
+
+ACTION_P(SetArg0, value) { arg0 = value; }
 TEST_F(DiscretizationGridSetup, TestInit) {
 
-  MockDiscretization mock_discretization;
-  MockDiscretizationGrid discretization_grid(mock_discretization);
+  MockDiscretizationGrid discretization_grid;
 
   // assert calculate_nodes0 and calculate_ipCoordinates0 are called with expected values
+  std::array<int, 3> cells = {2,1,1};
+  discretization_grid.cells = cells;
+  std::array<double, 3> geom_size = {2e-5,1e-5,1e-5};
+  discretization_grid.geom_size = geom_size;
+  int grid_size = cells[0] * cells[1] * cells[2];
+
+  Eigen::Tensor<int, 1> mocked_vti_response(2);
+  mocked_vti_response.setValues({3, 4});
+  EXPECT_CALL(discretization_grid, VTI_readDataset_int(
+    testing::_)).WillOnce(SetArg0(mocked_vti_response));
+
+  Eigen::Tensor<double, 2> nodes0(3, 12);
+  nodes0.setValues({
+  {  1.1,  1.2,  1.3,  1.4,  1.5,  1.6,  1.7,  1.8,  1.9,  2.0,  2.1,  2.2 },
+  {  2.1,  2.2,  2.3,  2.4,  2.5,  2.6,  2.7,  2.8,  2.9,  3.0,  3.1,  3.2 },
+  {  3.1,  3.2,  3.3,  3.4,  3.5,  3.6,  3.7,  3.8,  3.9,  4.0,  4.1,  4.2 }
+  });
   EXPECT_CALL(discretization_grid, calculate_nodes0(
-    ArrayPointee(3, testing::ElementsAreArray(cells)), 
-    ArrayPointee(3, testing::ElementsAreArray(geom_size)), 
-    testing::Eq(0))).WillOnce(testing::DoDefault());
+    testing::_,
+    cells, 
+    geom_size, 
+    testing::Eq(0))).WillOnce(SetArg0(nodes0));
+
+
+  Eigen::Tensor<double, 2> IPcoordinates0(3, 2);
+  IPcoordinates0.setValues({
+  {  1.1,  1.2 },
+  {  2.1,  2.2 },
+  {  3.1,  3.2 }
+  });
   EXPECT_CALL(discretization_grid, calculate_ipCoordinates0(
-    ArrayPointee(3, testing::ElementsAreArray(cells)), 
-    ArrayPointee(3, testing::ElementsAreArray(geom_size)), 
-    testing::Eq(0))).WillOnce(testing::DoDefault());
-
-  // assert discretization_grid fortran function is called with expected values
-  std::vector<int> expected_grid(grid, grid + grid_size);
-  EXPECT_CALL(mock_discretization, init(
-    ArrayPointee(grid_size, testing::ElementsAreArray(expected_grid)), 
-    testing::Pointee(24),
+    testing::_,
+    cells, 
+    geom_size, 
+    testing::Eq(0))).WillOnce(SetArg0(IPcoordinates0));
+  
+  EXPECT_CALL(discretization_grid, discretization_init(
     testing::_, 
+    testing::Eq(2),
+    testing::_,
+    testing::Eq(2),
     testing::_, 
-    testing::Eq(48)))
+    testing::Eq(12),
+    testing::Eq(6)))
     .WillOnce(testing::Return());
-
-  // discretization_grid.init(false, &mock_vti_reader);
+  discretization_grid.init(false);
 }
-// test expected behaviour of calculate_ipCoordinates0 and calculate_nodes0
+
 class CoordCalculationSetup : public ::testing::Test {
   protected:
-    int cells[3] = {2,2,2};
-    double geom_size[3] = {1,2,4};
+    std::array<int, 3> cells = {2,1,1};
+    std::array<double, 3> geom_size = {2e-5,1e-5,1e-5};
 };
-TEST_F(CoordCalculationSetup, TestIpCoords) {
-  MockDiscretization mock_discretization;
-  DiscretizationGrid discretization_grid(mock_discretization);
-  // memory layout corresponds to required column-major format for fortran code
-  std::vector<double> expected_ipCoords = {
-      -0.25, -0.5, -1, 
-      0.25, -0.5, -1, 
-      -0.25, 0.5, -1, 
-      0.25, 0.5, -1, 
-      -0.25, -0.5, 1, 
-      0.25, -0.5, 1, 
-      -0.25, 0.5, 1, 
-      0.25, 0.5, 1,
-  };
-  ASSERT_THAT(discretization_grid.calculate_ipCoordinates0(cells, geom_size, 0), ArrayPointee(sizeof(expected_ipCoords), 
-              testing::ElementsAreArray(expected_ipCoords)));
+
+TEST_F(CoordCalculationSetup, TestCalculateIpCoords0) {
+  DiscretizationGrid discretization_grid;
+
+  Eigen::Tensor<double, 2> expected_IPcoordinates0(3, 2);
+  expected_IPcoordinates0.setValues({
+   {  5.0000000000000004e-06,  1.5000000000000002e-05 },
+   {  5.0000000000000004e-06,  5.0000000000000004e-06 },
+   {  5.0000000000000004e-06,  5.0000000000000004e-06 }
+  });
+
+  Eigen::Tensor<double, 2> IPcoordinates0(3, 2);
+  discretization_grid.calculate_ipCoordinates0(IPcoordinates0, cells, geom_size, 0);
+  tensor_eq(IPcoordinates0, expected_IPcoordinates0);
 }
-TEST_F(CoordCalculationSetup, TestNodes0) {
-  MockDiscretization mock_discretization;
-  DiscretizationGrid discretization_grid(mock_discretization);
-  std::vector<double> expected_nodeCoords = {
-      0, 0, 0, 
-      0.5, 0, 0, 
-      0, 1, 0, 
-      0.5, 1, 0, 
-      0, 0, 2, 
-      0.5, 0, 2, 
-      0, 1, 2, 
-      0.5, 1, 2
-  };
-  ASSERT_THAT(discretization_grid.calculate_nodes0(cells, geom_size, 0), ArrayPointee(sizeof(expected_nodeCoords), 
-              testing::ElementsAreArray(expected_nodeCoords)));
+
+TEST_F(CoordCalculationSetup, TestCalculateNodes0) {
+  DiscretizationGrid discretization_grid;
+
+  Eigen::Tensor<double, 2> expected_nodes0(3, 12);
+  expected_nodes0.setValues({
+   {  0                     ,  1.0000000000000001e-05,  2.0000000000000002e-05,  0,  
+      1.0000000000000001e-05,  2.0000000000000002e-05,  0                     ,  1.0000000000000001e-05,  
+      2.0000000000000002e-05,  0                     ,  1.0000000000000001e-05,  2.0000000000000002e-05 },
+   {  0                     ,  0                     ,  0                     ,  1.0000000000000001e-05,  
+      1.0000000000000001e-05,  1.0000000000000001e-05,  0                     ,  0,  
+      0                     ,  1.0000000000000001e-05,  1.0000000000000001e-05,  1.0000000000000001e-05 },
+   {  0                     ,  0                     ,  0                     ,  0,  
+      0                     ,  0                     ,  1.0000000000000001e-05,  1.0000000000000001e-05,  
+      1.0000000000000001e-05,  1.0000000000000001e-05,  1.0000000000000001e-05,  1.0000000000000001e-05 }
+  });
+  Eigen::Tensor<double, 2> nodes0(3, 12);
+  discretization_grid.calculate_nodes0(nodes0, cells, geom_size, 0);
+  tensor_eq(nodes0, expected_nodes0);
 }
 
 int main(int argc, char **argv) {
