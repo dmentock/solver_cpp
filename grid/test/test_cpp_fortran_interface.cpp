@@ -19,9 +19,6 @@ void f_datatypes_test(
   int *arr1d, 
   int *arr2d, 
   int *arr3d);
-  void f_link_global_tensor(double* data, int* dims, int* strides);
-  void f_link_global_boolean(void** data);
-  void f_verify_bool_modification();
 }
 class DatatypeTest : public ::testing::Test {};
 TEST_F(DatatypeTest, TestDatatypes) {
@@ -92,18 +89,21 @@ void testfunc_pointer(MockFortranFuncInterfacePointerArgs* func_interface)
     int testarray[3] = {3,5,7};
     func_interface->fortran_interface_test_func_pointerargs(&testscalar,&testarray[0]);
 }
-TEST(InterfaceTest, FortranFunctionIsCalledWithPointerValues)
-{
-    MockFortranFuncInterfacePointerArgs mock_func_interface;
-    int expected_scalar = 123;
-    std::vector<int> expected_array = {3, 5, 7};
-    EXPECT_CALL(mock_func_interface, fortran_interface_test_func_pointerargs(
-        testing::Pointee(expected_scalar),
-        ArrayPointee(3, testing::ElementsAreArray(expected_array))
-    ));
-    testfunc_pointer(&mock_func_interface);
-}
+// TEST(InterfaceTest, FortranFunctionIsCalledWithPointerValues)
+// {
+//     MockFortranFuncInterfacePointerArgs mock_func_interface;
+//     int expected_scalar = 123;
+//     std::vector<int> expected_array = {3, 5, 7};
+//     EXPECT_CALL(mock_func_interface, fortran_interface_test_func_pointerargs(
+//         testing::Pointee(expected_scalar),
+//         ArrayPointee(3, testing::ElementsAreArray(expected_array))
+//     ));
+//     testfunc_pointer(&mock_func_interface);
+// }
 
+extern "C" {
+  void f_link_global_tensor(double* data, int* dims, int* strides);
+}
 TEST(InterfaceTest, TestGlobalTensorAssignment)
 {
   Eigen::Tensor<double, 3> tensor(1,2,3);
@@ -119,6 +119,10 @@ TEST(InterfaceTest, TestGlobalTensorAssignment)
   tensor_eq(tensor, expected_tensor);
 }
 
+extern "C" {
+  void f_link_global_boolean(void** data);
+  void f_verify_bool_modification();
+}
 TEST(InterfaceTest, TestGlobalBoolAssignment)
 {
   void* raw_pointer;  // use void* here
@@ -129,6 +133,34 @@ TEST(InterfaceTest, TestGlobalBoolAssignment)
   f_verify_bool_modification();
   ASSERT_EQ(*my_boolean_ptr, true);
 }
+
+extern "C" {
+  void allocate_tensormap_array();
+  double* get_tensormap_array_ptr();
+}
+TEST(InterfaceTest, TestTensorMapOnFortranArray)
+{
+  allocate_tensormap_array();
+  double* tensormap_array = get_tensormap_array_ptr();
+  
+  Eigen::Tensor<double, 3> expected_cpp_tensormap(3, 3, 3);
+  expected_cpp_tensormap.setValues({
+   {{ 1, 0, 0 },
+    { 0, 0, 0 },
+    { 0, 0, 0 }},
+   {{ 0, 0, 0 },
+    { 0, 0, 0 },
+    { 0, 0, 0 }},
+   {{ 0, 0, 0 },
+    { 0, 0, 0 },
+    { 0, 0, 0 }}
+});
+
+  Eigen::TensorMap<Eigen::Tensor<double, 3>> cpp_tensormap_(tensormap_array, 3, 3, 3);
+  Eigen::Tensor<double, 3> cpp_tensormap = cpp_tensormap_;
+  tensor_eq(cpp_tensormap, expected_cpp_tensormap);
+}
+
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);

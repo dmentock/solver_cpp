@@ -4,6 +4,7 @@ module fortran_testmodule
 
   double precision, pointer :: my_global_ndarray(:,:,:)
   logical, target :: my_global_boolean = .false.
+  double precision, dimension(:,:,:), target, allocatable :: tensormap_array
 
 contains
 
@@ -77,18 +78,24 @@ subroutine link_global_boolean(c_bool) bind(C, name="f_link_global_boolean")
 
   c_bool = c_loc(my_global_boolean)
   my_global_boolean = .true.
-
 end subroutine link_global_boolean
 
 subroutine verify_bool_modification() bind(C, name="f_verify_bool_modification")
-
   if (my_global_boolean .neqv. .false.) then
     print *, "c++ boolean modification failed"
-    stop 0
+    stop 0  
   end if
   my_global_boolean = .true.
-
 end subroutine verify_bool_modification
 
+subroutine allocate_tensormap_array() bind(C, name="allocate_tensormap_array")
+  allocate(tensormap_array(3,3,3))
+  tensormap_array(1,1,1) = 1
+end subroutine allocate_tensormap_array
+
+function get_tensormap_array_ptr() bind(C, name="get_tensormap_array_ptr")
+  type(C_PTR) :: get_tensormap_array_ptr
+  get_tensormap_array_ptr = c_loc(tensormap_array)
+end function get_tensormap_array_ptr
 
 end module fortran_testmodule
