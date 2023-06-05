@@ -14,6 +14,11 @@
 #include "spectral/spectral.h"
 #include "spectral/mech/basic.h"
 
+using Eigen::Tensor;
+using Eigen::TensorMap;
+using Eigen::Matrix;
+using Eigen::MatrixXd;
+
 void MechBasic::init() {
   std::cout << "\n <<<+-  grid_mechanical_spectral_basic init  -+>>>\n";
   std::cout << "P. Eisenlohr et al., International Journal of Plasticity 46:37–53, 2013\n";
@@ -84,12 +89,12 @@ void MechBasic::init() {
   P_av.resize(3, 3);
   C_volAvg.resize(3, 3, 3, 3);
   C_minMaxAvg.resize(3, 3, 3, 3);
-  // constitutive_response(P,
-  //                       P_av,
-  //                       C_volAvg,
-  //                       C_minMaxAvg, // stress field, stress avg, global average of stiffness and (min+max)/2
-  //                       F_lastInc,          // target F
-  //                       0);
+  spectral.constitutive_response (P,
+                                  P_av,
+                                  C_volAvg,
+                                  C_minMaxAvg,
+                                  F_lastInc,
+                                  0);
   DMDAVecRestoreArray(da, solution_vec, &F_data);
   // add restart calls 253-268
   update_gamma(C_minMaxAvg);

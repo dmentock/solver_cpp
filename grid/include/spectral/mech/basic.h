@@ -3,10 +3,10 @@
 
 #include "spectral/mech/utilities.h"
 
-class MechBasic : public Utilities {
+class MechBasic : public MechUtilities {
 public:
   MechBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
-      : Utilities(config_, grid_, spectral_) {}
+      : MechUtilities(config_, grid_, spectral_) {}
   void init();
   static PetscErrorCode formResidual (DMDALocalInfo* residual_subdomain,
                                       void* F,
