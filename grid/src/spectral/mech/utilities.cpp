@@ -12,6 +12,7 @@
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <tensor_operations.h>
+#include <fortran_utilities.h>
 
 #include <complex>
 #include <algorithm>

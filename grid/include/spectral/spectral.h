@@ -9,6 +9,17 @@
 #include <cmath>
 #include <iostream>
 #include <config.h>
+using namespace std;
+using namespace Eigen;
+
+extern "C" {
+  void f_homogenization_fetch_tensor_pointers(double** homogenization_F0, double** homogenization_F, 
+                                              double** homogenization_P, double** homogenization_dPdF,
+                                              void** terminally_ill);
+  void f_homogenization_mechanical_response(double* Delta_t, int* cell_start, int* cell_end);
+  void f_homogenization_thermal_response(double* Delta_t, int* cell_start, int* cell_end);
+  void f_homogenization_mechanical_response2(double* Delta_t, int* FEsolving_execIP, int* FEsolving_execElem);
+}
 
 class Spectral {
 public:
@@ -29,6 +40,22 @@ public:
                     fftw_plan &plan_back,
                     const std::string& label);
   virtual std::array<std::complex<double>, 3> get_freq_derivative(std::array<int, 3>& k_s);
+
+  virtual void homogenization_fetch_tensor_pointers() {
+    double* homogenization_F0_ptr;
+    double* homogenization_F_ptr;
+    double* homogenization_P_ptr;
+    double* homogenization_dPdF_ptr;
+    void* raw_terminally_ill_ptr; 
+    f_homogenization_fetch_tensor_pointers (&homogenization_F0_ptr, &homogenization_F_ptr, 
+                                            &homogenization_P_ptr, &homogenization_dPdF_ptr,
+                                            &raw_terminally_ill_ptr);
+    homogenization_F0 = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F0_ptr, 3, 3, grid.n_cells_global);
+    homogenization_F = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F_ptr, 3, 3, grid.n_cells_global);
+    homogenization_P = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_P_ptr, 3, 3, grid.n_cells_global);
+    homogenization_dPdF = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 5>>>(homogenization_dPdF_ptr, 3, 3, 3, 3, grid.n_cells_global);
+    terminally_ill = static_cast<bool*>(raw_terminally_ill_ptr);
+  }
 
   double wgt;
   std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 5>>> tensorField_real;
