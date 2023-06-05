@@ -18,11 +18,9 @@
 #include "spectral/spectral.h"
 #include "spectral/mech/utilities.h"
 
-#include "test/array_matcher.h"
 #include "tensor_operations.h"
 #include "test/complex_concatenator.h"
 #include "helper.h"
-
 
 
 // class SpectralMockFFTW : public Spectral {
@@ -51,7 +49,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestInit) {
   Spectral spectral(config, *mock_grid);
   init_tensorfield(spectral, *mock_grid);
 
-  Utilities mech_utilities(config, *mock_grid, spectral);
+  MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   config.num_grid.memory_efficient = 0;
   Eigen::DSizes<Eigen::DenseIndex, 7> expected_gamma_hat_dims(3, 3, 3, 3, 2, 1, 1);
@@ -71,7 +69,7 @@ TEST_F(SimpleGridSetup,MechUtilitiesTestInitDivergenceCorrection) {
   Spectral spectral(config, *mock_grid);
   mock_grid->geom_size = std::array<double, 3>{3,4,5};
 
-  Utilities mech_utilities(config, *mock_grid, spectral);
+  MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   config.num_grid.divergence_correction = 0;
   mech_utilities.init_utilities();
@@ -96,7 +94,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestUpdateCoords) {
   init_vectorfield(spectral, *mock_grid);
   spectral.wgt = 0.5;
 
-  Utilities mech_utilities(config, *mock_grid, spectral);
+  MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   spectral.xi2nd.resize(3, 2, 1, 1);
   spectral.xi2nd.setValues({
@@ -141,7 +139,7 @@ TEST_F(SimpleGridSetup, TestUpdateGamma) {
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
-  Utilities mech_utilities(config, *mock_grid, spectral);
+  MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 4> C_min_max_avg(3,3,3,3);
   C_min_max_avg.setValues({
@@ -186,7 +184,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestForwardField) {
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
-  Utilities mech_utilities(config, *mock_grid, spectral);
+  MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 5> field_last_inc(3, 3, 2, 1, 1);
   field_last_inc.setValues({
@@ -228,9 +226,10 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestMaskedCompliance) {
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
-  Utilities mech_utilities(config, *mock_grid, spectral);
+  MechUtilities mech_utilities(config, *mock_grid, spectral);
 
-  std::array<double, 4> rot_bc_q = {1, 0, 0, 0};
+  // std::array<double, 4> rot_bc_q = {1, 0, 0, 0};
+  Eigen::Quaterniond rot_bc_q(1.0, 0.0, 0.0, 0.0);
 
   Eigen::Matrix<bool, 3, 3> mask_stress;
   mask_stress << true, true, true,
@@ -315,7 +314,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestDivergenceRMS) {
   init_tensorfield(spectral, *mock_grid);
   spectral.wgt = 0.25;
 
-  Utilities mech_utilities(config, *mock_grid, spectral);
+  MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 5> tensor_field(3, 3, 4, 1, 1);
   tensor_field.setValues({
@@ -379,7 +378,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestGammaConvolution) {
   Spectral spectral(config, *mock_grid);
   init_tensorfield(spectral, *mock_grid);
 
-  Utilities mech_utilities(config, *mock_grid, spectral);
+  MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 5> field(3, 3, 2, 1, 1);
   field.setValues({
