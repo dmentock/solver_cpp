@@ -5,3 +5,8 @@ stub/
 cmake_install.cmake
 CMakeCache.txt
 Makefile
+cmake-build-debug-visual-studio
+cmake-build-debug
+__pycache__/
+fortran_output.txt
+*.mod
