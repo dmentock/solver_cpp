@@ -8,10 +8,9 @@
 #include <math.h>
 
 #include <tensor_operations.h>
-#include <test/array_matcher.h>
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
-
+#include <helper.h>
 extern "C" {
 void f_datatypes_test(
   int *int_num,
@@ -116,7 +115,7 @@ TEST(InterfaceTest, TestGlobalTensorAssignment)
     {{1,2,0}, {0,0,0}}
   });
   f_link_global_tensor(tensor.data(), dims.data(), &n_dims);
-  tensor_eq(tensor, expected_tensor);
+  EXPECT_TRUE(tensor_eq(tensor, expected_tensor));
 }
 
 extern "C" {
@@ -136,15 +135,12 @@ TEST(InterfaceTest, TestGlobalBoolAssignment)
 
 extern "C" {
   void allocate_tensormap_array();
-  double* get_tensormap_array_ptr();
+  void get_tensormap_array_ptr(double** tensormap_array);
 }
-TEST(InterfaceTest, TestTensorMapOnFortranArray)
-{
-  allocate_tensormap_array();
-  double* tensormap_array = get_tensormap_array_ptr();
-  
-  Eigen::Tensor<double, 3> expected_cpp_tensormap(3, 3, 3);
-  expected_cpp_tensormap.setValues({
+TEST(InterfaceTest, TestTensorMapOnFortranArray) {
+
+  Eigen::Tensor<double, 3> expected_cpp_tensor(3, 3, 3);
+  expected_cpp_tensor.setValues({
    {{ 1, 0, 0 },
     { 0, 0, 0 },
     { 0, 0, 0 }},
@@ -154,13 +150,15 @@ TEST(InterfaceTest, TestTensorMapOnFortranArray)
    {{ 0, 0, 0 },
     { 0, 0, 0 },
     { 0, 0, 0 }}
-});
+  });
 
+  allocate_tensormap_array();
+  double* tensormap_array;
+  get_tensormap_array_ptr(&tensormap_array);  
   Eigen::TensorMap<Eigen::Tensor<double, 3>> cpp_tensormap_(tensormap_array, 3, 3, 3);
-  Eigen::Tensor<double, 3> cpp_tensormap = cpp_tensormap_;
-  tensor_eq(cpp_tensormap, expected_cpp_tensormap);
+  Eigen::Tensor<double, 3> cpp_tensor = cpp_tensormap_;
+  EXPECT_TRUE(tensor_eq(cpp_tensor, expected_cpp_tensor));
 }
-
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
