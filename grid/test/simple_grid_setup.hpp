@@ -6,40 +6,39 @@
 #include <spectral/spectral.h>
 #include "spectral/mech/utilities.h"
 #include <config.h>
+#include <unsupported/Eigen/CXX11/Tensor>
+
 
 extern "C" {
-  void f_homogenization_init (double* homogenization_F, int* dims_homog_F, 
-                              double* homogenization_P, int* dims_homog_P,
-                              void** terminally_ill);
+  void f_homogenization_init();
 }
 
 using Tensor2 = Eigen::Tensor<double, 2>;
 using array3i = std::array<int, 3>;
 using array3d = std::array<double, 3>;
+
 class MockDiscretizedGrid : public DiscretizationGrid {
   public:
-  MockDiscretizedGrid(std::array<int, 3> cells_) : DiscretizationGrid() {
-      world_rank = 0;
-      world_size = 1;
+  MockDiscretizedGrid(std::array<int, 3> cells_)
+    : DiscretizationGrid(cells_) {
+    world_rank = 0;
+    world_size = 1;
 
-      cells = cells_;
+    cells0_reduced = cells[0] / 2 + 1;
 
-      cells0_reduced = cells[0] / 2 + 1;
+    cells1_tensor = cells[1];
+    cells1_offset_tensor = 0;
+    
+    cells2 = cells[2];
+    cells2_offset = 0;  
 
-      cells1_tensor = cells[1];
-      cells1_offset_tensor = 0;
-      
-      cells2 = cells[2];
-      cells2_offset = 0;  
-
-      geom_size[0] = cells_[0]*1e-5; geom_size[1] = cells_[1]*1e-5; geom_size[2] = cells_[2]*1e-5;
-      scaled_geom_size[0] = cells_[0]; scaled_geom_size[1] = cells_[1]; scaled_geom_size[2] = cells_[2];
-      size2 = geom_size[2] * cells2 / cells[2];
-      size2Offset = geom_size[2] * cells2_offset / cells[2];
-
-    }  
-    MOCK_METHOD(void, calculate_nodes0, (Tensor2&, array3i&, array3d&, int), (override));
-    MOCK_METHOD(void, calculate_ipCoordinates0, (Tensor2&, array3i&, array3d&, int), (override));
+    geom_size[0] = cells_[0]*1e-5; geom_size[1] = cells_[1]*1e-5; geom_size[2] = cells_[2]*1e-5;
+    scaled_geom_size[0] = cells_[0]; scaled_geom_size[1] = cells_[1]; scaled_geom_size[2] = cells_[2];
+    size2 = geom_size[2] * cells2 / cells[2];
+    size2Offset = geom_size[2] * cells2_offset / cells[2];
+  }
+  // MOCK_METHOD(void, calculate_nodes0, (Tensor2&, array3i&, array3d&, int), (override));
+  // MOCK_METHOD(void, calculate_ipCoordinates0, (Tensor2&, array3i&, array3d&, int), (override));
 };
 
 class SimpleGridSetup : public ::testing::Test {
@@ -49,6 +48,23 @@ protected:
 public:
   void init_grid(std::array<int, 3> dims) {
     mock_grid = std::make_unique<MockDiscretizedGrid>(dims);
+  }
+  void init_discretization() {
+    Eigen::Tensor<int, 1> materialAt(mock_grid->n_cells_global);
+    for (size_t i = 0; i < mock_grid->n_cells_global; i++) {
+      materialAt[i] = i;
+    }
+    Eigen::Tensor<double, 2> ipCoordinates0;
+    mock_grid->calculate_ipCoordinates0(ipCoordinates0, mock_grid->cells, mock_grid->geom_size, 0);
+    Eigen::Tensor<double, 2> nodes0;
+    mock_grid->calculate_nodes0(nodes0, mock_grid->cells, mock_grid->geom_size, 0);
+    int sharedNodesBegin = (mock_grid->world_rank+1 == mock_grid->world_size) ? 
+      (mock_grid->cells[0]+1) * (mock_grid->cells[1]+1) * mock_grid->cells2 : 
+      (mock_grid->cells[0]+1) * (mock_grid->cells[1]+1) * (mock_grid->cells2+1);
+    mock_grid->discretization_init(materialAt.data(), mock_grid->n_cells_global,
+                        ipCoordinates0.data(), ipCoordinates0.dimension(1),
+                        nodes0.data(), nodes0.dimension(1),
+                        sharedNodesBegin);
   }
   void init_tensorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid) {
     ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
@@ -69,16 +85,11 @@ public:
 
   void* raw_void_pointer;
   void init_minimal_homogenization(Spectral &spectral) {
-    spectral.homogenization_F.resize(3,3,2);
-    spectral.homogenization_F.setZero();
-    spectral.homogenization_P.resize(3,3,2);
-    spectral.homogenization_P.setZero();
     std::array<int, 3> shape = {3,3,2};
-    f_homogenization_init(spectral.homogenization_F.data(), shape.data(),
-                          spectral.homogenization_P.data(), shape.data(),
-                          &raw_void_pointer);
+    f_homogenization_init();
+    // spectral.homogenization_fetch_tensor_pointers();
     spectral.terminally_ill = static_cast<bool*>(raw_void_pointer);
-    std::cout << "QQ " << *spectral.terminally_ill << std::endl;
+
   }
 };
 

@@ -1,6 +1,5 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <test/array_matcher.h>
 #include <iostream>
 #include <cstdio>
 #include <fstream>
@@ -13,8 +12,10 @@
 #include "tensor_operations.h"
 #include "helper.h"
 
-class MockDiscretizationGrid : public DiscretizationGrid {
+class PartialMockDiscretizationGrid : public DiscretizationGrid {
   public:
+    PartialMockDiscretizationGrid(std::array<int, 3> cells_)
+    : DiscretizationGrid(cells_) {}
     using Tensor1i = Eigen::Tensor<int, 1>;
     using Tensor2d = Eigen::Tensor<double, 2>;
     using array3i = std::array<int, 3>;
@@ -42,7 +43,7 @@ class DiscretizationGridSetup : public ::testing::Test {
 ACTION_P(SetArg0, value) { arg0 = value; }
 TEST_F(DiscretizationGridSetup, TestInit) {
 
-  MockDiscretizationGrid discretization_grid;
+  PartialMockDiscretizationGrid discretization_grid(std::array<int, 3>{2, 1, 1});
 
   // assert calculate_nodes0 and calculate_ipCoordinates0 are called with expected values
   std::array<int, 3> cells = {2,1,1};
@@ -67,7 +68,6 @@ TEST_F(DiscretizationGridSetup, TestInit) {
     cells, 
     geom_size, 
     testing::Eq(0))).WillOnce(SetArg0(nodes0));
-
 
   Eigen::Tensor<double, 2> IPcoordinates0(3, 2);
   IPcoordinates0.setValues({
@@ -100,7 +100,7 @@ class CoordCalculationSetup : public ::testing::Test {
 };
 
 TEST_F(CoordCalculationSetup, TestCalculateIpCoords0) {
-  DiscretizationGrid discretization_grid;
+  DiscretizationGrid discretization_grid(std::array<int, 3>{2, 1, 1});
 
   Eigen::Tensor<double, 2> expected_IPcoordinates0(3, 2);
   expected_IPcoordinates0.setValues({
@@ -111,11 +111,11 @@ TEST_F(CoordCalculationSetup, TestCalculateIpCoords0) {
 
   Eigen::Tensor<double, 2> IPcoordinates0(3, 2);
   discretization_grid.calculate_ipCoordinates0(IPcoordinates0, cells, geom_size, 0);
-  tensor_eq(IPcoordinates0, expected_IPcoordinates0);
+  EXPECT_TRUE(tensor_eq(IPcoordinates0, expected_IPcoordinates0));
 }
 
 TEST_F(CoordCalculationSetup, TestCalculateNodes0) {
-  DiscretizationGrid discretization_grid;
+  DiscretizationGrid discretization_grid(std::array<int, 3>{2, 1, 1});
 
   Eigen::Tensor<double, 2> expected_nodes0(3, 12);
   expected_nodes0.setValues({
@@ -131,7 +131,7 @@ TEST_F(CoordCalculationSetup, TestCalculateNodes0) {
   });
   Eigen::Tensor<double, 2> nodes0(3, 12);
   discretization_grid.calculate_nodes0(nodes0, cells, geom_size, 0);
-  tensor_eq(nodes0, expected_nodes0);
+  EXPECT_TRUE(tensor_eq(nodes0, expected_nodes0));
 }
 
 int main(int argc, char **argv) {

@@ -89,6 +89,7 @@ void DiscretizationGrid::calculate_ipCoordinates0(Eigen::Tensor<double, 2>& ipCo
                                                   array<double, 3>& geom_size, 
                                                   int cells2_offset){
   int N = cells[0] * cells[1] * cells[2];
+  ipCoordinates0.resize(3, N);
   int i = 0;
   for (int c = 0; c < cells[2]; ++c) {
     for (int b = 0; b < cells[1]; ++b) {
@@ -106,19 +107,20 @@ void DiscretizationGrid::calculate_nodes0(Eigen::Tensor<double, 2>& nodes0,
                                           array<int, 3>& cells, 
                                           array<double, 3>& geom_size, 
                                           int cells2_offset) {
-    int N = (cells[0]+1) * (cells[1]+1) * (cells[2]+1);
-    int i = 0;
-    nodes0.setZero();
-    for (int c = 0; c < cells[2]; ++c) {
-        for (int b = 0; b < cells[1]; ++b) {
-            for (int a = 0; a < cells[0]; ++a) {
-                nodes0(0, i) = geom_size[0] / cells[0] * a;
-                nodes0(1, i) = geom_size[1] / cells[1] * b;
-                nodes0(2, i) = geom_size[2] / cells[2] * c + cells2_offset;
-                i++;
-            }
-        }
+  int N = (cells[0]+1) * (cells[1]+1) * (cells[2]+1);
+  nodes0.resize(3, N);
+  nodes0.setZero();
+  int i = 0;
+  for (int c = 0; c < cells[2]; ++c) {
+    for (int b = 0; b < cells[1]; ++b) {
+      for (int a = 0; a < cells[0]; ++a) {
+        nodes0(0, i) = geom_size[0] / cells[0] * a;
+        nodes0(1, i) = geom_size[1] / cells[1] * b;
+        nodes0(2, i) = geom_size[2] / cells[2] * c + cells2_offset;
+        i++;
+      }
     }
+  }
 }
 
 int DiscretizationGrid::modulo(int x,int N){

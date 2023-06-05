@@ -18,11 +18,14 @@ extern "C" {
 
 class DiscretizationGrid {
 public:
+  DiscretizationGrid(std::array<int, 3> cells_)
+      : cells(cells_) {}
   int world_rank, world_size;
 
   std::array<int, 3> cells;
   int cells2;
   int cells2_offset;
+  int n_cells_global = cells[0] * cells[1] * cells[2];
 
   std::array<double, 3> geom_size;
   std::array<double, 3> scaled_geom_size;
@@ -39,8 +42,8 @@ public:
                                 std::array<double, 3>& geom_size,
                                 int cells2_offset);
   virtual void calculate_ipCoordinates0(Eigen::Tensor<double, 2>& ipCoordinates0, 
-                                        array<int, 3>& cells, 
-                                        array<double, 3>& geom_size, 
+                                        std::array<int, 3>& cells, 
+                                        std::array<double, 3>& geom_size, 
                                         int cells2_offset);
   static int modulo(int x,int N);
 
@@ -71,6 +74,6 @@ public:
   }
   void discretization_setIPcoords(double* IPcoords0);
   void discretization_setNodeCoords(double* NodeCoords);
-
+    
 };
 #endif // DISCRETIZATION_GRID_H

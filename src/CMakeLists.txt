@@ -19,16 +19,41 @@ target_link_libraries(f_math
                       f_misc
                       f_lapack)
 
+add_library(f_discretization SHARED discretization.f90)
+target_link_libraries(f_discretization
+                      PUBLIC
+                      f_VTI)
+
+                      
+add_library(f_homogenization_mechanical SHARED homogenization_mechanical.f90)
+target_link_libraries(f_homogenization_mechanical 
+                      PUBLIC
+                      f_prec
+                      f_discretization
+                      f_math)
+
+add_library(f_homogenization SHARED homogenization.f90)
+target_link_libraries(f_homogenization 
+                      PUBLIC
+                      f_math
+                      f_homogenization_mechanical)
 
 add_library(f_rotations SHARED rotations.f90)
 target_link_libraries(f_rotations 
-add_library(VTI VTI.f90)
-target_link_libraries(VTI
+                      PUBLIC
+                      f_math)
+
+add_library(f_VTI SHARED VTI.f90)
+target_link_libraries(f_VTI
                       PUBLIC
                       f_prec)
 
+                      
 
-add_library(discretization discretization.cpp)
+
+# add_library(discretization discretization.cpp)
 
 add_library(config config.cpp)
 target_link_libraries(config yaml-cpp)
+
+

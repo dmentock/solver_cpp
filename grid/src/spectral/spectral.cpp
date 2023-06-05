@@ -14,6 +14,8 @@
 #include <petsc.h>
 #include <stdexcept>
 #include <cmath>
+#include <fortran_utilities.h>
+
 
 void Spectral::init(){
   std::cout << "\n <<<+-  spectral init  -+>>>" << std::endl;
@@ -188,4 +190,92 @@ std::array<std::complex<double>, 3> Spectral::get_freq_derivative(std::array<int
     }
     return freq_derivative;
 }
+
+void Spectral::constitutive_response(Tensor<double, 5> &P, 
+                                      Tensor<double, 2> &P_av, 
+                                      Tensor<double, 4> &C_volAvg, 
+                                      Tensor<double, 4> &C_minMaxAvg,
+                                      Tensor<double, 5> &F,
+                                      double Delta_t,
+                                      std::optional<Eigen::Quaterniond> rot_bc_q) {
+
+  std::cout << F.dimension(2);
+  Tensor<double, 3> homogenization_F;
+  homogenization_F = F.reshape(Eigen::array<int, 3>({3, 3, grid.cells[0] * grid.cells[1] * grid.cells2}));
+
+  int cell_start = 1;
+  int n_cells = grid.cells[0] * grid.cells[1] * grid.cells2;
+  mechanical_response(Delta_t, cell_start, n_cells);
+  if (!*terminally_ill)
+    thermal_response(Delta_t, cell_start, n_cells);
+
+  if (!*terminally_ill) {
+      std::array<int, 2> FEsolving_execIP = {1, 1};
+      std::array<int, 2> FEsolving_execElem = {1, n_cells};
+      mechanical_response2(Delta_t, FEsolving_execIP, FEsolving_execElem);
+  }
+
+  P = homogenization_P->reshape(F.dimensions());
+  Eigen::array<Eigen::Index, 3> dims_to_reduce = {2, 3, 4};
+  P_av = (P.sum(dims_to_reduce) * wgt).eval();  
+  MPI_Allreduce(MPI_IN_PLACE, P_av.data(), 9, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
+
+
+  Eigen::array<int, 2> P_transpose_dims = {1, 0};
+  if (rot_bc_q.has_value()) {
+    if (!rot_bc_q.value().isApprox(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0))) {
+      std::cout << "Piola--Kirchhoff stress (lab) / MPa = " << P_av.shuffle(P_transpose_dims) * 1.e-6 << std::endl;
+    }
+    P_av = FortranUtilities::rotate_tensor2(rot_bc_q.value(), P_av);
+  }
+  std::cout << "Piola--Kirchhoff stress       / MPa = " << P_av.shuffle(P_transpose_dims) * 1.e-6 << std::endl;
+
+  Eigen::Tensor<double, 4> dPdF_max(3, 3, 3, 3);
+  dPdF_max.setZero();
+  Eigen::Tensor<double, 4> dPdF_min(3, 3, 3, 3);
+  dPdF_min.setConstant(std::numeric_limits<double>::max());
+  double dPdF_norm_max = 0;
+  double dPdF_norm_min = std::numeric_limits<double>::max(); 
+
+  for(int i = 0; i < n_cells; i++) {
+    Eigen::Tensor<double, 4> homogenization_dPdF_chip = homogenization_dPdF->chip(i, 4).square().eval();
+    double norm_sq = tensor_sum(homogenization_dPdF_chip); // assuming last index is the cell index
+    if (dPdF_norm_max < norm_sq) {
+      dPdF_max = homogenization_dPdF->chip(i, 4);
+      dPdF_norm_max = norm_sq;
+    }
+    if(dPdF_norm_min > norm_sq) {
+      dPdF_min = homogenization_dPdF->chip(i, 4);
+      dPdF_norm_min = norm_sq;
+    }
+  }
+
+  std::array<double, 2> valueAndRank = {dPdF_norm_max, static_cast<double>(MPI::COMM_WORLD.Get_rank())};
+  MPI::COMM_WORLD.Allreduce(MPI_IN_PLACE, valueAndRank.data(), 1, MPI::DOUBLE_INT, MPI::MAXLOC);
+  int broadcast_rank = static_cast<int>(valueAndRank[1]);
+  MPI::COMM_WORLD.Bcast(dPdF_max.data(), 81, MPI::DOUBLE, broadcast_rank);
+
+  valueAndRank = {dPdF_norm_min, static_cast<double>(MPI::COMM_WORLD.Get_rank())};
+  MPI::COMM_WORLD.Allreduce(MPI_IN_PLACE, valueAndRank.data(), 1, MPI::DOUBLE_INT, MPI::MINLOC);
+  broadcast_rank = static_cast<int>(valueAndRank[1]);
+  MPI::COMM_WORLD.Bcast(dPdF_min.data(), 81, MPI::DOUBLE, broadcast_rank);
+
+  Eigen::Tensor<double, 4> C_minmaxAvg = 0.5 * (dPdF_max + dPdF_min);
+  C_volAvg = homogenization_dPdF->sum(Eigen::array<int, 1>{4});
+  
+  MPI::COMM_WORLD.Allreduce(MPI_IN_PLACE, C_volAvg.data(), 81, MPI::DOUBLE, MPI::SUM);
+  C_volAvg = C_volAvg * wgt;
+}
+
+
+void Spectral::mechanical_response(double Delta_t, int cell_start, int cell_end){
+  f_homogenization_mechanical_response(&Delta_t, &cell_start, &cell_end);
+}
+void Spectral::thermal_response(double Delta_t, int cell_start, int cell_end){
+  f_homogenization_thermal_response(&Delta_t, &cell_start, &cell_end);
+}
+void Spectral::mechanical_response2(double Delta_t, std::array<int, 2>& FEsolving_execIP, std::array<int, 2>& FEsolving_execElem){
+  f_homogenization_mechanical_response2(&Delta_t, FEsolving_execIP.data(), FEsolving_execElem.data());
+}
+  
 
