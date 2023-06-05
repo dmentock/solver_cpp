@@ -39,14 +39,14 @@ contains
 !--------------------------------------------------------------------------------------------------
 !> @brief stores the relevant information in globally accesible variables
 !--------------------------------------------------------------------------------------------------
-subroutine discretization_init(materialAt, n_materialpoints, &
+subroutine discretization_init(materialAt, discretization_Nelems, &
                                IPcoords0, n_ips, &
                                NodeCoords0, n_nodes, &
                                sharedNodesBegin) bind(C, name="f_discretization_init")
 
   integer,          intent(in) :: &
-    n_materialpoints, n_ips, n_nodes
-  integer,     dimension(n_materialpoints),   intent(in) :: &
+    discretization_Nelems, n_ips, n_nodes
+  integer,     dimension(discretization_Nelems),   intent(in) :: &
     materialAt
   real(pReal), dimension(3,n_ips), intent(in) :: &
     IPcoords0
@@ -57,7 +57,6 @@ subroutine discretization_init(materialAt, n_materialpoints, &
 
   print'(/,1x,a)', '<<<+-  discretization init  -+>>>'; flush(6)
 
-  discretization_Nelems = size(materialAt,1)
   discretization_nIPs   = size(IPcoords0,2)/discretization_Nelems
   discretization_Ncells = discretization_Nelems*discretization_nIPs
 

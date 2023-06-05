@@ -1,6 +1,5 @@
 module rotations
   use iso_c_binding, only: c_double, c_int, c_ptr
-  use prec
   use math
 
   implicit none(type,external)
@@ -44,14 +43,23 @@ module rotations
 
 contains
 
-subroutine f_rotate_tensor4(qu, T, rotated) bind(C, name="f_rotate_tensor4")
-    real(c_double), intent(in), dimension(4) :: qu
-    real(c_double),     intent(in),  dimension(3,3,3,3) :: T
-    real(c_double),     intent(out), dimension(3,3,3,3) :: rotated
-    type(tRotation) :: rot
-    rot%q = qu
-    rotated = rot%rotTensor4(T)
-end subroutine f_rotate_tensor4
+subroutine rotate_tensor4(qu, T, rotated) bind(C, name="f_rotate_tensor4")
+  real(c_double), intent(in), dimension(4) :: qu
+  real(c_double),     intent(in),  dimension(3,3,3,3) :: T
+  real(c_double),     intent(out), dimension(3,3,3,3) :: rotated
+  type(tRotation) :: rot
+  rot%q = qu
+  rotated = rot%rotTensor4(T)
+end subroutine rotate_tensor4
+
+subroutine rotate_tensor2(qu, T, rotated) bind(C, name="f_rotate_tensor2")
+  real(c_double), intent(in), dimension(4) :: qu
+  real(c_double),     intent(in),  dimension(3,3) :: T
+  real(c_double),     intent(out), dimension(3,3) :: rotated
+  type(tRotation) :: rot
+  rot%q = qu
+  rotated = rot%rotTensor2(T)
+end subroutine rotate_tensor2
 
 pure function asMatrix(self)
 
@@ -64,11 +72,11 @@ pure function asMatrix(self)
 end function asMatrix
 
 subroutine qu2om_(qu, om) bind(C, name="f_qu2om")
-    use, intrinsic :: iso_c_binding
-    real(c_double), intent(in), dimension(4) :: qu
-    real(c_double), intent(out), dimension(3,3) :: om
+  use, intrinsic :: iso_c_binding
+  real(c_double), intent(in), dimension(4) :: qu
+  real(c_double), intent(out), dimension(3,3) :: om
 
-    om = qu2om(qu)
+  om = qu2om(qu)
 end subroutine qu2om_
 
 

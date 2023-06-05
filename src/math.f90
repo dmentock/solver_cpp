@@ -23,6 +23,14 @@ module math
       3,2, &
       3,3  &
       ],shape(MAPPLAIN))                                                                        !< conversion from degree to radian
+
+  real(pReal), dimension(3,3), parameter :: &
+    math_I3 = reshape([&
+      1.0_pReal,0.0_pReal,0.0_pReal, &
+      0.0_pReal,1.0_pReal,0.0_pReal, &
+      0.0_pReal,0.0_pReal,1.0_pReal  &
+      ],shape(math_I3))                                                                             !< 3x3 Identity
+
 contains
 
 pure subroutine math_invert(InvA, error, A, n) bind(C, name="f_math_invert")
