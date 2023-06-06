@@ -1,15 +1,11 @@
 #ifndef UTILITIES_H
 #define UTILITIES_H
 
-#include <vector>
-#include <array>
-#include <string>
-#include <memory>
-#include <unsupported/Eigen/CXX11/Tensor>
-#include <spectral/spectral.h>
 #include <config.h>
 #include <discretization_grid.h>
+#include <spectral/spectral.h>
 
+#include <unsupported/Eigen/CXX11/Tensor>
 
 using Eigen::Tensor;
 using Eigen::TensorMap;
@@ -22,7 +18,6 @@ class MechUtilities {
 public:
   MechUtilities(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
       : config(config_), grid(grid_), spectral(spectral_) {}
-
 
   void init_utilities();
   virtual void update_coords (Tensor<double, 5> &F, 

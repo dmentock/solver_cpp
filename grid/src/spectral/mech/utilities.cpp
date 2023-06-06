@@ -1,22 +1,11 @@
 #include "spectral/mech/utilities.h"
-#include "helper.h"
 
-#include <mpi.h>
-#include <iostream>
-#include <stdexcept>
-#include <vector>
-
-#include <fftw3-mpi.h>
-#include <petsc.h>
-
-#include <Eigen/Dense>
-#include <unsupported/Eigen/CXX11/Tensor>
-#include <tensor_operations.h>
 #include <fortran_utilities.h>
+#include <tensor_operations.h>
 
-#include <complex>
-#include <algorithm>
-#include <cmath>
+#include <iostream>
+#include <array>
+#include <string>
 #include <limits>
 
 void MechUtilities::init_utilities(){
@@ -276,13 +265,13 @@ void MechUtilities::calculate_masked_compliance( Tensor<double, 4> &C,
                                             const Eigen::Matrix<bool, 3, 3> &mask_stress,
                                             Tensor<double, 4> &masked_compliance) {
 
-  std::array<bool, 9> mask_stress_vector;
+  std::array<bool, 9> mask_stress_1d;
   for (int col = 0; col < mask_stress.cols(); ++col) {
     for (int row = 0; row < mask_stress.rows(); ++row) {
-      mask_stress_vector[col * mask_stress.rows() + row] = !mask_stress(row, col);
+      mask_stress_1d[col * mask_stress.rows() + row] = !mask_stress(row, col);
     }
   }
-  int size_reduced = std::count(mask_stress_vector.begin(), mask_stress_vector.end(), true);
+  int size_reduced = std::count(mask_stress_1d.begin(), mask_stress_1d.end(), true);
 
   Eigen::Matrix<double, 9, 9> temp99_real;
   if (size_reduced > 0) {
@@ -292,7 +281,7 @@ void MechUtilities::calculate_masked_compliance( Tensor<double, 4> &C,
     Eigen::Matrix<bool, 9, 9> mask;
     for (int i = 0; i < 9; ++i) {
       for (int j = 0; j < 9; ++j) {
-        mask(i, j) = mask_stress_vector[i] && mask_stress_vector[j];
+        mask(i, j) = mask_stress_1d[i] && mask_stress_1d[j];
       }
     }
     Eigen::MatrixXd c_reduced(size_reduced, size_reduced);
@@ -477,45 +466,3 @@ Tensor<double, 5> MechUtilities::gamma_convolution(Tensor<double, 5> &field, Ten
 
 
 
-// Eigen::Tensor<double, 4> Utilities::calculate_scalar_gradient(const Eigen::Tensor<double, 3>& field) {
-//     std::cout << "calling calculate_scalar_gradient" << std::endl;
-
-//     Eigen::Tensor<double, 4> grad(3, grid.cells[0], grid.cells[1], grid.cells2);
-//     // print_tensor("field", &field);
-//     // print_tensor_map("scalarField_real0", *scalarField_real);
-//     // // Zero out the extended part of scalarField_real
-//     // scalarField_real->slice(Eigen::array<int, 3>({grid.cells[0], 0, 0}),
-//     //                        Eigen::array<int, 3>({grid.cells0_reduced*2-grid.cells[0], grid.cells[1], grid.cells2}))
-//     //     .setConstant(0);
-//     // // Copy field to the first part of scalarField_real
-//     // scalarField_real->slice(Eigen::array<int, 3>({0, 0, 0}),
-//     //                        Eigen::array<int, 3>({grid.cells[0], grid.cells[1], grid.cells2})) = field;
-//     // print_tensor_map("scalarField_real1", *scalarField_real);
-
-//     // // Perform forward FFT
-//     // fftw_mpi_execute_dft_r2c(plan_scalar_forth, scalarField_real->data(), scalarField_fourier_fftw);
-//     // print_tensor_map("scalarField_real2", *scalarField_real);
-//     // print_tensor_map("scalarField_fourier", *scalarField_fourier);
-
-//     // // Multiply scalarField_fourier by xi1st
-//     // for (int j = 0; j < grid.cells[1]; ++j) {
-//     //     for (int k = 0; k < grid.cells[2]; ++k) {
-//     //         for (int i = 0; i < grid.cells2; ++i) {
-//     //             for (int l = 0; l < 3; ++l) {
-//     //                 (*vectorField_fourier)(l, i, k, j) = (*scalarField_fourier)(i, k, j) * xi1st(l, i, k, j);
-//     //             }
-//     //         }
-//     //     }
-//     // }
-
-//     // // // Perform backward FFT
-//     // // fftw_mpi_execute_dft_c2r(planVectorBack, vectorField_fourier.data(), vectorField_real.data());
-
-//     // // // Multiply vectorField_real by wgt and extract the relevant portion
-//     // // Eigen::Tensor<double, 4> grad(3, grid.cells[0], grid.cells[1], grid.cells[2]);
-//     // // grad = vectorField_real.slice(Eigen::array<int, 4>({0, 0, 0, 0}),
-//     // //                               Eigen::array<int, 4>({3, grid.cells[0], grid.cells[1], grid.cells[2]})) *
-//     // //        wgt;
-
-//     return grad;
-// }

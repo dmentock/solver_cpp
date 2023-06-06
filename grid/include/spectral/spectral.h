@@ -2,15 +2,13 @@
 #define SPECTRAL_H
 
 #include <discretization_grid.h>
+#include <config.h>
+
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <Eigen/Geometry> 
 
 #include <fftw3-mpi.h>
 #include <complex>
-#include <memory>
-#include <cmath>
-#include <iostream>
-#include <config.h>
 #include <optional>
 
 using namespace std;

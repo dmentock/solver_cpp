@@ -1,26 +1,22 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <iostream>
-#include <cstdio>
-#include <fstream>
-
-#include <mpi.h>
-#include <petscsys.h>
-#include <petsc.h>
-#include <unsupported/Eigen/CXX11/Tensor>
 
 #include "spectral/spectral.h"
+
 #include "simple_grid_setup.hpp"
 #include "init_environments.hpp"
+
+#include <unsupported/Eigen/CXX11/Tensor>
 
 #include <test/complex_concatenator.h>
 #include <tensor_operations.h>
 #include <helper.h>
 
 
+
 TEST_F(SimpleGridSetup,SpectralTestInit) {
-  init_grid(std::array<int, 3>{2,1,1});
-  init_discretization();
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_discretization();
   Spectral spectral(config, *mock_grid);
 
   Eigen::Tensor<std::complex<double>, 4> expected_xi1st(3, 2, 1, 1);
@@ -51,11 +47,12 @@ TEST_F(SimpleGridSetup,SpectralTestInit) {
 }
 
 TEST_F(SimpleGridSetup, SpectralTestHomogenizationFetchTensors) {
-  init_grid(std::array<int, 3>{2,1,1});
-  init_discretization();
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_discretization();
   f_homogenization_init();
   Spectral spectral(config, *mock_grid);
   spectral.homogenization_fetch_tensor_pointers();
+  f_deallocate_resources();
 }
 
 TEST_F(SimpleGridSetup, SpectralTestConstitutiveResponse) {
@@ -69,13 +66,13 @@ TEST_F(SimpleGridSetup, SpectralTestConstitutiveResponse) {
     MOCK_METHOD(void, mechanical_response2, (double Delta_t, array2& FEsolving_execIP, array2& FEsolving_execElem), (override));
   };
 
-  init_grid(std::array<int, 3>{2,1,1});
-  init_discretization();
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_discretization();
   f_homogenization_init();
 
   PartialMockSpectral spectral(config, *mock_grid);
   spectral.homogenization_fetch_tensor_pointers();
-  init_tensorfield(spectral, *mock_grid);
+  gridSetup_init_tensorfield(spectral, *mock_grid);
 
   spectral.wgt = 0.5;
   spectral.homogenization_dPdF->setValues({

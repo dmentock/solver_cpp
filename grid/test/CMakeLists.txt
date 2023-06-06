@@ -5,7 +5,6 @@ include_directories(${GTEST_INCLUDE_DIRS}
 
 enable_language(Fortran)
 add_library(stub_fortran_interface SHARED stub_fortran_interface.f90)
-target_compile_options(stub_fortran_interface PUBLIC "-fvisibility=default")
 
 add_executable(test_cpp_fortran_interface test_cpp_fortran_interface.cpp)
 target_link_libraries(test_cpp_fortran_interface
@@ -26,6 +25,7 @@ add_executable(test_spectral test_spectral.cpp)
 target_link_libraries(test_spectral 
                       spectral
                       discretization_grid
+                      f_clean_up_fortran
                       GTest::GTest 
                       GTest::Main 
                       gmock gmock_main)

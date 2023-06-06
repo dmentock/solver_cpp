@@ -2,6 +2,7 @@
 #define MECH_BASIC_H
 
 #include "spectral/mech/utilities.h"
+#include <petsc.h>
 
 class MechBasic : public MechUtilities {
 public:
@@ -12,13 +13,6 @@ public:
                                       void* F,
                                       void* r,
                                       void* dummy);
-  static PetscErrorCode converged(SNES snes_local,
-                                  PetscInt PETScIter,
-                                  PetscReal  devNull1,
-                                  PetscReal  devNull2,
-                                  PetscReal  devNull3,
-                                  SNESConvergedReason* reason, 
-                                  void* ctx);
 
   Eigen::Tensor<double, 2> P_av;
   Eigen::Tensor<double, 4> C_volAvg;

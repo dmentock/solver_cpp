@@ -1,53 +1,23 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <iostream>
-#include <cstdio>
-#include <fstream>
-
-#include <mpi.h>
-#include <petscsys.h>
-#include <petsc.h>
-#include <fftw3-mpi.h>
+#include "spectral/spectral.h"
+#include "spectral/mech/utilities.h"
 
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <Eigen/Core>
 
 #include "simple_grid_setup.hpp"
 #include "init_environments.hpp"
-#include "spectral/spectral.h"
-#include "spectral/mech/utilities.h"
 
-#include "tensor_operations.h"
 #include "test/complex_concatenator.h"
+#include "tensor_operations.h"
 #include "helper.h"
 
-
-// class SpectralMockFFTW : public Spectral {
-// public:
-//   SpectralMockFFTW(DiscretizationGrid& grid_) : Spectral(grid_) {}
-//   template <int Rank>
-//   void set_up_fftw (ptrdiff_t& cells1_fftw, 
-//                     ptrdiff_t& cells1_offset, 
-//                     ptrdiff_t& cells2_fftw,
-//                     int size,
-//                     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>>& field_real,
-//                     std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>>& field_fourier,
-//                     fftw_complex*& field_fourier_fftw,
-//                     int fftw_planner_flag,
-//                     fftw_plan& plan_forth, 
-//                     fftw_plan& plan_back,
-//                     const std::string& label) {
-//     cells1_fftw = 1;
-//     cells1_offset = 0;
-//     std::cout << "mockymockymockymockymockymockymockymockymockymockymockymockymockymockymockymockymockymocky" << std::endl;
-//   }
-// };
-
 TEST_F(SimpleGridSetup, MechUtilitiesTestInit) {
-  init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
-  init_tensorfield(spectral, *mock_grid);
+  gridSetup_init_tensorfield(spectral, *mock_grid);
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
 
@@ -65,7 +35,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestInit) {
 }
 
 TEST_F(SimpleGridSetup,MechUtilitiesTestInitDivergenceCorrection) {
-  init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   mock_grid->geom_size = std::array<double, 3>{3,4,5};
 
@@ -87,23 +57,23 @@ TEST_F(SimpleGridSetup,MechUtilitiesTestInitDivergenceCorrection) {
 }
 
 TEST_F(SimpleGridSetup, MechUtilitiesTestUpdateCoords) {
-  init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
 
-  init_tensorfield(spectral, *mock_grid);
-  init_vectorfield(spectral, *mock_grid);
+  gridSetup_init_tensorfield(spectral, *mock_grid);
+  gridSetup_init_vectorfield(spectral, *mock_grid);
   spectral.wgt = 0.5;
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   spectral.xi2nd.resize(3, 2, 1, 1);
   spectral.xi2nd.setValues({
-   {{{ c( 0               ,  0               ) }},
+   {{{ c( 0               ,  0                ) }},
     {{ c( 0               ,  314159.2653589793) }}},
-   {{{ c( 0               ,  0               ) }},
-    {{ c( 0               ,  0               ) }}},
-   {{{ c( 0               ,  0               ) }},
-    {{ c( 0               ,  0               ) }}}
+   {{{ c( 0               ,  0                ) }},
+    {{ c( 0               ,  0                ) }}},
+   {{{ c( 0               ,  0                ) }},
+    {{ c( 0               ,  0                ) }}}
   });
 
   Eigen::Tensor<double, 5> F(3, 3, 2, 1, 1);
@@ -135,7 +105,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestUpdateCoords) {
 }
 
 TEST_F(SimpleGridSetup, TestUpdateGamma) {
-  init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
@@ -180,7 +150,7 @@ TEST_F(SimpleGridSetup, TestUpdateGamma) {
 }
 
 TEST_F(SimpleGridSetup, MechUtilitiesTestForwardField) {
-  init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
@@ -222,13 +192,12 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestForwardField) {
 }
 
 TEST_F(SimpleGridSetup, MechUtilitiesTestMaskedCompliance) {
-  init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
 
-  // std::array<double, 4> rot_bc_q = {1, 0, 0, 0};
   Eigen::Quaterniond rot_bc_q(1.0, 0.0, 0.0, 0.0);
 
   Eigen::Matrix<bool, 3, 3> mask_stress;
@@ -309,9 +278,9 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestMaskedCompliance) {
 }
 
 TEST_F(SimpleGridSetup, MechUtilitiesTestDivergenceRMS) {
-  init_grid(std::array<int, 3>{4,1,1}); // use larger grid to enter if branch
+  gridSetup_init_grid(std::array<int, 3>{4,1,1}); // use larger grid to enter if branch
   Spectral spectral(config, *mock_grid);
-  init_tensorfield(spectral, *mock_grid);
+  gridSetup_init_tensorfield(spectral, *mock_grid);
   spectral.wgt = 0.25;
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
@@ -374,32 +343,23 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestDivergenceRMS) {
 }
 
 TEST_F(SimpleGridSetup, MechUtilitiesTestGammaConvolution) {
-  init_grid(std::array<int, 3>{2,1,1});
+  gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
-  init_tensorfield(spectral, *mock_grid);
+  gridSetup_init_tensorfield(spectral, *mock_grid);
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 5> field(3, 3, 2, 1, 1);
   field.setValues({
-   {{{{  9235641.189939182  }},
-     {{  9632014.409984397  }}},
-    {{{ -228992.9056867184  }},
-     {{ -137151.7288854052  }}},
-    {{{ -165027.6813614937  }},
-     {{  277655.7139282213  }}}},
-   {{{{ -228992.9056867179  }},
-     {{ -137151.7288854057  }}},
-    {{{  9558636.645616129  }},
-     {{  9685168.179161072  }}},
-    {{{ -255116.5173901524  }},
-     {{  281005.5981252654  }}}},
-   {{{{ -165044.1841296307  }},
-     {{  277683.4794996136  }}},
-    {{{ -255142.0290418919  }},
-     {{  281033.698685078   }}},
-    {{{  15980056.25126295  }},
-     {{  15457099.20758347  }}}}
+   {{{{  9235641.189939182  }}, {{  9632014.409984397  }}},
+    {{{ -228992.9056867184  }}, {{ -137151.7288854052  }}},
+    {{{ -165027.6813614937  }}, {{  277655.7139282213  }}}},
+   {{{{ -228992.9056867179  }}, {{ -137151.7288854057  }}},
+    {{{  9558636.645616129  }}, {{  9685168.179161072  }}},
+    {{{ -255116.5173901524  }}, {{  281005.5981252654  }}}},
+   {{{{ -165044.1841296307  }}, {{  277683.4794996136  }}},
+    {{{ -255142.0290418919  }}, {{  281033.698685078   }}},
+    {{{  15980056.25126295  }}, {{  15457099.20758347  }}}}
   });
 
   Eigen::Tensor<double, 2> field_aim(3, 3);
@@ -484,7 +444,6 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestGammaConvolution) {
   EXPECT_TRUE(tensor_eq(gamma_field1, expected_gamma_field));
   //TODO: add test where det of A is large enough to enter if branch for memory_efficient=1
 }
-
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);

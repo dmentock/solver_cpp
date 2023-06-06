@@ -6,11 +6,13 @@
 #include <spectral/spectral.h>
 #include "spectral/mech/utilities.h"
 #include <config.h>
+#include <petsc.h>
 #include <unsupported/Eigen/CXX11/Tensor>
 
 
 extern "C" {
   void f_homogenization_init();
+  void f_deallocate_resources();
 }
 
 using Tensor2 = Eigen::Tensor<double, 2>;
@@ -37,19 +39,18 @@ class MockDiscretizedGrid : public DiscretizationGrid {
     size2 = geom_size[2] * cells2 / cells[2];
     size2Offset = geom_size[2] * cells2_offset / cells[2];
   }
-  // MOCK_METHOD(void, calculate_nodes0, (Tensor2&, array3i&, array3d&, int), (override));
-  // MOCK_METHOD(void, calculate_ipCoordinates0, (Tensor2&, array3i&, array3d&, int), (override));
 };
 
 class SimpleGridSetup : public ::testing::Test {
 protected:
   std::unique_ptr<MockDiscretizedGrid> mock_grid;
   Config config;
+  PetscErrorCode ierr;
 public:
-  void init_grid(std::array<int, 3> dims) {
+  void gridSetup_init_grid(std::array<int, 3> dims) {
     mock_grid = std::make_unique<MockDiscretizedGrid>(dims);
   }
-  void init_discretization() {
+  void gridSetup_init_discretization() {
     Eigen::Tensor<int, 1> materialAt(mock_grid->n_cells_global);
     for (size_t i = 0; i < mock_grid->n_cells_global; i++) {
       materialAt[i] = i;
@@ -66,7 +67,7 @@ public:
                         nodes0.data(), nodes0.dimension(1),
                         sharedNodesBegin);
   }
-  void init_tensorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid) {
+  void gridSetup_init_tensorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid) {
     ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
     spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
                        spectral.tensorField_real, spectral.tensorField_fourier, spectral.tensorField_fourier_fftw,
@@ -75,21 +76,12 @@ public:
     mock_grid.cells1_tensor = cells1_fftw;
     mock_grid.cells1_offset_tensor = cells1_offset;
   }
-  void init_vectorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid){
+  void gridSetup_init_vectorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid){
     ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
     spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
                        spectral.vectorField_real, spectral.vectorField_fourier, spectral.vectorField_fourier_fftw,
                        FFTW_MEASURE, spectral.plan_vector_forth, spectral.plan_vector_back,
                        "vector");
-  }
-
-  void* raw_void_pointer;
-  void init_minimal_homogenization(Spectral &spectral) {
-    std::array<int, 3> shape = {3,3,2};
-    f_homogenization_init();
-    // spectral.homogenization_fetch_tensor_pointers();
-    spectral.terminally_ill = static_cast<bool*>(raw_void_pointer);
-
   }
 };
 

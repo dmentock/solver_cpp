@@ -48,7 +48,10 @@ target_link_libraries(f_VTI
                       PUBLIC
                       f_prec)
 
-                      
+add_library(f_clean_up_fortran SHARED clean_up_fortran.f90)
+target_link_libraries(f_clean_up_fortran
+                      PUBLIC
+                      f_homogenization)
 
 
 # add_library(discretization discretization.cpp)

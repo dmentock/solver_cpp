@@ -1,14 +1,13 @@
+#include <petsc.h>
+#include <petscsys.h>
 #include <petscsnes.h>
-#include <petscdmda.h>
 #include <petscdm.h>
-#include <mpi.h>
+#include <petscdmda.h>
+
 #include <vector>
-#include <array>
-#include <string>
-#include <memory>
 #include <iostream>
+
 #include <Eigen/Dense>
-#include <helper.h>
 #include <unsupported/Eigen/CXX11/Tensor>
 
 #include "spectral/spectral.h"
@@ -18,7 +17,6 @@ using Eigen::Tensor;
 using Eigen::TensorMap;
 using Eigen::Matrix;
 using Eigen::MatrixXd;
-
 void MechBasic::init() {
   std::cout << "\n <<<+-  grid_mechanical_spectral_basic init  -+>>>\n";
   std::cout << "P. Eisenlohr et al., International Journal of Plasticity 46:37–53, 2013\n";
@@ -101,37 +99,6 @@ void MechBasic::init() {
   C_minMaxAvgRestart = C_minMaxAvg;
 }
 
-PetscErrorCode MechBasic::converged (SNES snes_local,
-                          PetscInt PETScIter,
-                          PetscReal devNull1,
-                          PetscReal devNull2,
-                          PetscReal devNull3,
-                          SNESConvergedReason* reason,
-                          void* ctx) { 
-    return 0;
-    // double divTol = std::max(std::max(std::abs(P_av)) * num.eps_div_rtol, num.eps_div_atol);
-    // double BCTol = std::max(std::max(std::abs(P_av)) * num.eps_stress_rtol, num.eps_stress_atol);
-
-    // if ((totalIter >= num.itmin && (err_div / divTol < 1.0 && err_BC / BCTol < 1.0)) || terminallyIll) {
-    //     reason = 1;
-    // } else if (totalIter >= num.itmax) {
-    //     reason = -1;
-    // } else {
-    //     reason = 0;
-    // }
-
-    // std::cout << std::endl << " ... reporting ............................................................." << std::endl;
-    // std::cout << std::endl
-    //           << " error divergence = " << std::fixed << std::setprecision(2) << err_div / divTol
-    //           << " (" << std::scientific << std::setprecision(2) << err_div << " / m, tol = " << std::scientific << std::setprecision(2) << divTol << ")"
-    //           << std::endl;
-    // std::cout << " error stress BC  = " << std::fixed << std::setprecision(2) << err_BC / BCTol
-    //           << " (" << std::scientific << std::setprecision(2) << err_BC << " Pa,  tol = " << std::scientific << std::setprecision(2) << BCTol << ")"
-    //           << std::endl;
-    // std::cout << std::endl << "===========================================================================" << std::endl;
-    // std::cout.flush();
-    // err_PETSc = 0;
-}
 PetscErrorCode MechBasic::formResidual (DMDALocalInfo *residual_subdomain,
                                         void *F_void,
                                         void *r_void,

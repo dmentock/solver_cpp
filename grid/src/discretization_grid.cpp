@@ -1,14 +1,9 @@
 #include <iostream>
-#include <vector>
-#include <numeric>
 
 #include <mpi.h>
 #include <fftw3-mpi.h>
 
 #include "discretization_grid.h"
-
-#include <iostream>
-#include <fstream>
 
 void DiscretizationGrid::init(bool restart) {
     MPI_Comm_rank(MPI_COMM_WORLD, &world_rank);
@@ -18,7 +13,6 @@ void DiscretizationGrid::init(bool restart) {
     double origin[3];
     Eigen::Tensor<int, 1> materialAt_global;
     if (world_rank == 0) {
-      // array<int, n_cells> materialAt_global;
       materialAt_global.resize(cells[0] * cells[1] * cells[2]);
       VTI_readDataset_int(materialAt_global);
       // call result_openJobFile(parallel=.false.)
@@ -65,13 +59,13 @@ void DiscretizationGrid::init(bool restart) {
     MPI_Gather(&n_materialpoints_local, 1, MPI_INT, gridpoint_numbers, 1, MPI_INT, 0, MPI_COMM_WORLD);
 
     Eigen::Tensor<int, 1> materialAt(n_materialpoints_local);
-    int a = MPI_Scatterv(materialAt_global.data(), 
-                        gridpoint_numbers, 
-                        displacements, 
-                        MPI_INTEGER, 
-                        materialAt.data(), 
-                        n_materialpoints_local, 
-                        MPI_INTEGER, 0, MPI_COMM_WORLD);
+    MPI_Scatterv (materialAt_global.data(), 
+                  gridpoint_numbers, 
+                  displacements, 
+                  MPI_INTEGER, 
+                  materialAt.data(), 
+                  n_materialpoints_local, 
+                  MPI_INTEGER, 0, MPI_COMM_WORLD);
 
     Eigen::Tensor<double, 2> ipCoordinates0;
     calculate_ipCoordinates0(ipCoordinates0, local_grid, local_size, cells2_offset);
@@ -87,16 +81,16 @@ void DiscretizationGrid::init(bool restart) {
 void DiscretizationGrid::calculate_ipCoordinates0(Eigen::Tensor<double, 2>& ipCoordinates0, 
                                                   array<int, 3>& cells, 
                                                   array<double, 3>& geom_size, 
-                                                  int cells2_offset){
+                                                  int cells2_offset) {
   int N = cells[0] * cells[1] * cells[2];
   ipCoordinates0.resize(3, N);
   int i = 0;
   for (int c = 0; c < cells[2]; ++c) {
     for (int b = 0; b < cells[1]; ++b) {
       for (int a = 0; a < cells[0]; ++a) {
-        ipCoordinates0(0, i) = geom_size[0] / cells[0] * (a - 0.5);
-        ipCoordinates0(1, i) = geom_size[1] / cells[1] * (b - 0.5);
-        ipCoordinates0(2, i) = geom_size[2] / cells[2] * (c + cells2_offset - 0.5);
+        ipCoordinates0(0, i) = geom_size[0] / cells[0] * (a + 0.5);
+        ipCoordinates0(1, i) = geom_size[1] / cells[1] * (b + 0.5);
+        ipCoordinates0(2, i) = geom_size[2] / cells[2] * (c + cells2_offset + 0.5);
         i++;
       }
     }
@@ -111,18 +105,18 @@ void DiscretizationGrid::calculate_nodes0(Eigen::Tensor<double, 2>& nodes0,
   nodes0.resize(3, N);
   nodes0.setZero();
   int i = 0;
-  for (int c = 0; c < cells[2]; ++c) {
-    for (int b = 0; b < cells[1]; ++b) {
-      for (int a = 0; a < cells[0]; ++a) {
+  for (int c = 0; c <= cells[2]; ++c) {
+    for (int b = 0; b <= cells[1]; ++b) {
+      for (int a = 0; a <= cells[0]; ++a) {
         nodes0(0, i) = geom_size[0] / cells[0] * a;
         nodes0(1, i) = geom_size[1] / cells[1] * b;
-        nodes0(2, i) = geom_size[2] / cells[2] * c + cells2_offset;
+        nodes0(2, i) = geom_size[2] / cells[2] * (c + cells2_offset);
         i++;
       }
     }
   }
 }
 
-int DiscretizationGrid::modulo(int x,int N){
+int DiscretizationGrid::modulo(int x,int N) {
     return (x % N + N) %N;
 }

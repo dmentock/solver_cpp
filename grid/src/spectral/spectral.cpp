@@ -1,20 +1,17 @@
-#include "spectral/spectral.h"
 
-#include <mpi.h>
-#include <iostream>
+#include "spectral/spectral.h"
+#include <fortran_utilities.h>
+
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <Eigen/Dense>
-#include <helper.h>
-#include <tensor_operations.h>
 
-#include <complex>
-#include <vector>
-#include <algorithm>
 #include <fftw3-mpi.h>
 #include <petsc.h>
-#include <stdexcept>
-#include <cmath>
-#include <fortran_utilities.h>
+#include <complex>
+#include <iostream>
+
+#include <helper.h>
+#include <tensor_operations.h>
 
 
 void Spectral::init(){

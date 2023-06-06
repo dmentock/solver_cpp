@@ -2,7 +2,6 @@ add_library(discretization_grid discretization_grid.cpp)
 target_link_libraries(discretization_grid 
                       PUBLIC
                       f_discretization
-                      # CLI
                       f_VTI
                       ${MPI_C_LIBRARIES}
                       ${MPI_CXX_LIBRARIES}

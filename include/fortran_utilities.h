@@ -2,6 +2,7 @@
 #define FORTRAN_UTILITIES_H
 
 #include <unsupported/Eigen/CXX11/Tensor>
+#include <iostream>
 
 extern "C" {
   void f_math_invert(double* InvA, int* err, double* A, int* n);
@@ -39,10 +40,5 @@ class FortranUtilities {
   }
 };
 
-
-// bool homogenization_mechanical_response(double Delta_t, int cell_start, int cell_end) {
-//   bool* terminally_ill = false;
-//   f_homogenization_mechanical_response
-// }
 
 #endif // FORTRAN_UTILITIES_H

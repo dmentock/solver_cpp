@@ -1,8 +1,5 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include <iostream>
-#include <cstdio>
-#include <fstream>
 
 #include <mpi.h>
 #include <fftw3-mpi.h>
