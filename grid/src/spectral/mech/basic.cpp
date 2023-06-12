@@ -50,7 +50,7 @@ void MechBasic::init() {
   Vec solution_vec;
   DMCreateGlobalVector(da, &solution_vec);
   DMDASNESSetFunctionLocal(da, INSERT_VALUES, formResidual, PETSC_NULLPTR);
-  SNESSetConvergenceTest(SNES_mechanical, converged, PETSC_NULL, NULL);
+  // SNESSetConvergenceTest(SNES_mechanical, converged, PETSC_NULL, NULL);
   SNESSetDM(SNES_mechanical, da);
   SNESSetFromOptions(SNES_mechanical);
 
