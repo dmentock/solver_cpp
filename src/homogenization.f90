@@ -2,6 +2,8 @@ module homogenization
   use prec
   use math
   use iso_c_binding
+  use discretization
+
   implicit none(type,external)
 
   public ::  &
@@ -19,19 +21,21 @@ module homogenization
     homogenization_P                                                                                !< first P--K stress of IP
   real(pReal),   dimension(:,:,:,:,:), allocatable, target, public :: & !, protected ::  &
     homogenization_dPdF
-  interface
-    module subroutine mechanical_init()
-    end subroutine mechanical_init
-  end interface
 
 contains
 
-
 subroutine homogenization_init() bind(C, name="f_homogenization_init")
-
   call mechanical_init()
-
 end subroutine homogenization_init
+
+subroutine mechanical_init()
+  print'(/,1x,a)', '<<<+-  homogenization:mechanical init  -+>>>'
+  allocate(homogenization_dPdF(3,3,3,3,discretization_Ncells), source=0.0_pReal)
+  print *, "discretization_Ncells", discretization_Ncells
+  homogenization_F0 = spread(math_I3, 3,discretization_Ncells)
+  homogenization_F = homogenization_F0
+  allocate(homogenization_P(3,3,discretization_Ncells),source=0.0_pReal)
+end subroutine mechanical_init
 
 subroutine homogenization_fetch_tensor_pointers(c_homog_F0, c_homog_F, &
                                 c_homog_P, &

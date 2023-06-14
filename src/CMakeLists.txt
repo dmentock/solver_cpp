@@ -24,24 +24,19 @@ target_link_libraries(f_discretization
                       PUBLIC
                       f_VTI)
 
-                                            
-add_library(f_homogenization_mechanical SHARED homogenization_mechanical.f90)
-target_link_libraries(f_homogenization_mechanical 
-                      PUBLIC
-                      f_prec
-                      f_discretization
-                      f_math)
-
 add_library(f_homogenization SHARED homogenization.f90)
-target_link_libraries(f_homogenization 
-                      PUBLIC
-                      f_homogenization_mechanical
-                      f_math)
+target_link_libraries(f_homogenization
+                    PUBLIC
+                    f_prec
+                    f_discretization
+                    f_math)
+
 
 add_library(f_rotations SHARED rotations.f90)
 target_link_libraries(f_rotations 
                       PUBLIC
-                      f_math)
+                      f_math
+                      f_homogenization)
 
 add_library(f_VTI SHARED VTI.f90)
 target_link_libraries(f_VTI

@@ -13,6 +13,113 @@
 #include <helper.h>
 #include <tensor_operations.h>
 
+template <int Rank>
+void FFT<Rank>::init_fft (std::array<int, 3>& cells,
+                          int cells2,
+                          std::vector<int>& extra_dims,
+                          int fftw_planner_flag,
+                          ptrdiff_t* cells1_fftw,
+                          ptrdiff_t* cells1_offset,
+                          ptrdiff_t* cells2_fftw) {
+
+  int cells0_reduced = cells[0]/2+1;
+
+  ptrdiff_t N, cells2_offset;
+  ptrdiff_t fftw_dims[3] = {cells[2], cells[1], cells0_reduced};
+  int size = (extra_dims.size() > 1) ? std::accumulate(extra_dims.begin(), extra_dims.end(), 1, std::multiplies<int>()) : 1;
+
+  N = fftw_mpi_local_size_many_transposed(3, fftw_dims, size, 
+                                          FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
+                                          PETSC_COMM_WORLD, 
+                                          cells2_fftw, &cells2_offset, 
+                                          cells1_fftw, cells1_offset);
+  field_fourier_fftw = fftw_alloc_complex(N);
+  
+  std::vector<ptrdiff_t> dims_real_(extra_dims.begin(), extra_dims.end());
+  dims_real_.insert(dims_real_.end(), {cells0_reduced * 2, cells[1], cells2});
+  Eigen::array<ptrdiff_t, Rank> dims_real;
+  std::copy_n(dims_real_.begin(), Rank, dims_real.begin());
+  field_real.reset(new Eigen::TensorMap<Eigen::Tensor<double, Rank>>(reinterpret_cast<double*>(field_fourier_fftw), dims_real));
+
+  std::vector<ptrdiff_t> dims_fourier_(extra_dims.begin(), extra_dims.end());
+  dims_fourier_.insert(dims_fourier_.end(), {cells0_reduced, cells[2], *cells1_fftw});
+  Eigen::array<ptrdiff_t, Rank> dims_fourier;
+  std::copy_n(dims_fourier_.begin(), Rank, dims_fourier.begin());
+  field_fourier.reset(new Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>(reinterpret_cast<std::complex<double>*>(field_fourier_fftw), dims_fourier));
+
+  std::array<ptrdiff_t, 3> cells_reversed = {cells[2], cells[1], cells[0]};
+
+  plan_forth = fftw_mpi_plan_many_dft_r2c(3, cells_reversed.data(), size,
+                                          FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
+                                          field_real->data(),
+                                          reinterpret_cast<fftw_complex*>(field_fourier->data()),
+                                          PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_OUT);
+
+  plan_back = fftw_mpi_plan_many_dft_c2r (3, cells_reversed.data(), size,
+                                          FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
+                                          reinterpret_cast<fftw_complex*>(field_fourier->data()),
+                                          field_real->data(),
+                                          PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_IN);
+
+  // set indices for field value assignments
+  indices_nullify_start.fill(0);
+  indices_nullify_start[Rank - 3] = cells[0];
+  indices_nullify_extents.fill(3);
+  indices_nullify_extents[Rank - 3] = cells0_reduced * 2 - cells[0];
+  indices_nullify_extents[Rank - 2] = cells[1];
+  indices_nullify_extents[Rank - 1] = cells2;
+
+  indices_values_start.fill(0);
+  indices_values_extents_real.fill(3);
+  indices_values_extents_real[Rank - 3] = cells[0];
+  indices_values_extents_real[Rank - 2] = cells[1];
+  indices_values_extents_real[Rank - 1] = cells2;
+
+  indices_values_extents_fourier.fill(3);
+  indices_values_extents_fourier[Rank - 3] = cells0_reduced;
+  indices_values_extents_fourier[Rank - 2] = cells[2];
+  indices_values_extents_fourier[Rank - 1] = *cells1_fftw;
+}
+
+
+template <int Rank>
+void FFT<Rank>::set_field_real(Eigen::Tensor<double, Rank> &field_real_) {
+  field_real->slice(indices_nullify_start, indices_nullify_extents).setZero(); 
+  field_real->slice(indices_values_start, indices_values_extents_real) = field_real_;
+}
+
+template <int Rank>
+void FFT<Rank>::set_field_fourier(Eigen::Tensor<complex<double>, Rank> &field_fourier_) {
+  field_fourier->slice(indices_values_start, indices_values_extents_fourier) = field_fourier_;
+}
+
+template <int Rank>
+Eigen::Tensor<double, Rank> FFT<Rank>::get_field_real() {
+  Eigen::Tensor<double, Rank> field_real_ = *field_real;
+  return field_real_;
+}
+
+template <int Rank>
+Eigen::Tensor<complex<double>, Rank> FFT<Rank>::get_field_fourier() {
+  Eigen::Tensor<complex<double>, Rank> field_fourier_ = *field_fourier;
+  return field_fourier_;
+}
+
+template <int Rank>
+void FFT<Rank>::forward() {
+  fftw_mpi_execute_dft_r2c(plan_forth, field_real->data(), field_fourier_fftw);
+}
+
+template <int Rank>
+void FFT<Rank>::backward(double &wgt) {
+  fftw_mpi_execute_dft_c2r(plan_back, field_fourier_fftw, field_real->data());
+  *field_real = *field_real * wgt;
+}
+
+template class FFT<3>;
+template class FFT<4>;
+template class FFT<5>;
+
 
 void Spectral::init(){
   std::cout << "\n <<<+-  spectral init  -+>>>" << std::endl;
@@ -44,24 +151,24 @@ void Spectral::init(){
   ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
 
   // call tensor func
-  set_up_fftw(cells1_fftw, cells1_offset, 
-              cells2_fftw,
-              tensor_size, 
-              tensorField_real, tensorField_fourier, tensorField_fourier_fftw,
-              fftw_planner_flag, plan_tensor_forth, plan_tensor_back,
-              "tensor");
-  grid.cells1_tensor = cells1_fftw;
-  grid.cells1_offset_tensor = cells1_offset;
+  // set_up_fftw(cells1_fftw, cells1_offset, 
+  //             cells2_fftw,
+  //             tensor_size, 
+  //             tensorField_real, tensorField_fourier, tensorField_fourier_fftw,
+  //             fftw_planner_flag, plan_tensor_forth, plan_tensor_back,
+  //             "tensor");
+  // grid.cells1_tensor = cells1_fftw;
+  // grid.cells1_offset_tensor = cells1_offset;
 
-  set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, vector_size, 
-              vectorField_real, vectorField_fourier, vectorField_fourier_fftw,
-              fftw_planner_flag, plan_vector_forth, plan_vector_back,
-              "vector");
+  // set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, vector_size, 
+  //             vectorField_real, vectorField_fourier, vectorField_fourier_fftw,
+  //             fftw_planner_flag, plan_vector_forth, plan_vector_back,
+  //             "vector");
 
-  set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, scalar_size, 
-              scalarField_real, scalarField_fourier, scalarField_fourier_fftw,
-              fftw_planner_flag, plan_scalar_forth, plan_scalar_back,
-              "scalar");
+  // set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, scalar_size, 
+  //             scalarField_real, scalarField_fourier, scalarField_fourier_fftw,
+  //             fftw_planner_flag, plan_scalar_forth, plan_scalar_back,
+  //             "scalar");
 
   xi1st.resize(3, grid.cells0_reduced, grid.cells[2], grid.cells1_tensor);
     xi1st.setConstant(std::complex<double>(0,0));
@@ -94,67 +201,7 @@ void Spectral::init(){
       }
     }
   }
-}
-
-template <int Rank>
-void Spectral::set_up_fftw (ptrdiff_t& cells1_fftw, 
-                            ptrdiff_t& cells1_offset, 
-                            ptrdiff_t& cells2_fftw,
-                            int size,
-                            std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>>& field_real,
-                            std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>>& field_fourier,
-                            fftw_complex*& field_fourier_fftw,
-                            int fftw_planner_flag,
-                            fftw_plan& plan_forth, 
-                            fftw_plan& plan_back,
-                            const std::string& label){
-    ptrdiff_t N, cells2_offset;
-    ptrdiff_t fftw_dims[3] = {grid.cells[2], grid.cells[1], grid.cells0_reduced};
-    N = fftw_mpi_local_size_many_transposed(3, fftw_dims, size, 
-                                            FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
-                                            PETSC_COMM_WORLD, 
-                                            &cells2_fftw, &cells2_offset, 
-                                            &cells1_fftw, &cells1_offset);
-    field_fourier_fftw = fftw_alloc_complex(N);
-    
-    auto create_dimensions = [](const std::initializer_list<ptrdiff_t>& init_list) {
-      Eigen::array<ptrdiff_t, Rank> arr;
-      std::copy(init_list.begin(), init_list.end(), arr.begin());
-      return arr;
-    };
-    Eigen::array<ptrdiff_t, Rank> dims_real;
-    Eigen::array<ptrdiff_t, Rank> dims_fourier;
-    if (label == "tensor") {
-      dims_real = create_dimensions({3, 3, grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
-      dims_fourier = create_dimensions({3, 3, grid.cells0_reduced, grid.cells[2], cells1_fftw});
-    } else {
-      if (cells1_fftw != grid.cells1_tensor) throw std::runtime_error("domain decomposition mismatch ("+ label +", Fourier space)");
-      if (label == "vector") {
-        dims_real = create_dimensions({3, grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
-        dims_fourier = create_dimensions({3, grid.cells0_reduced, grid.cells[2], cells1_fftw});
-      } else if (label == "scalar") {
-        dims_real = create_dimensions({grid.cells0_reduced * 2, grid.cells[1], cells2_fftw});
-        dims_fourier = create_dimensions({grid.cells0_reduced, grid.cells[2], cells1_fftw});
-      } else {
-        throw std::runtime_error("Invalid label");
-      }
-    } 
-    field_real.reset(new Eigen::TensorMap<Eigen::Tensor<double, Rank>>(reinterpret_cast<double*>(field_fourier_fftw), dims_real));
-    field_fourier.reset(new Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>(reinterpret_cast<std::complex<double>*>(field_fourier_fftw), dims_fourier));
-    ptrdiff_t cells_reversed[3] = {grid.cells[2], grid.cells[1], grid.cells[0]};              
-    plan_forth = fftw_mpi_plan_many_dft_r2c(3, cells_reversed, size,
-                                               FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
-                                               field_real->data(),
-                                               reinterpret_cast<fftw_complex*>(field_fourier->data()),
-                                               PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_OUT);
-
-    plan_back = fftw_mpi_plan_many_dft_c2r(3, cells_reversed, size,
-                                              FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
-                                              reinterpret_cast<fftw_complex*>(field_fourier->data()),
-                                              field_real->data(),
-                                              PETSC_COMM_WORLD, fftw_planner_flag | FFTW_MPI_TRANSPOSED_IN);
-    if (!plan_tensor_forth) throw std::runtime_error("FFTW error r2c " + label);
-    if (!plan_tensor_back) throw std::runtime_error("FFTW error c2r " + label);
+  homogenization_fetch_tensor_pointers(); // initialize homogenization array pointers to point to the fortran definitions
 }
 
 std::array<std::complex<double>, 3> Spectral::get_freq_derivative(std::array<int, 3>& k_s) {
@@ -188,11 +235,11 @@ std::array<std::complex<double>, 3> Spectral::get_freq_derivative(std::array<int
     return freq_derivative;
 }
 
-void Spectral::constitutive_response(Tensor<double, 5> &P, 
+void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P, 
                                       Tensor<double, 2> &P_av, 
                                       Tensor<double, 4> &C_volAvg, 
                                       Tensor<double, 4> &C_minMaxAvg,
-                                      Tensor<double, 5> &F,
+                                      TensorMap<Tensor<double, 5>> &F,
                                       double Delta_t,
                                       std::optional<Eigen::Quaterniond> rot_bc_q) {
 
@@ -276,3 +323,45 @@ void Spectral::mechanical_response2(double Delta_t, std::array<int, 2>& FEsolvin
 }
   
 
+// Tensor<double, 4> MechUtilities::calculate_scalar_gradient(const Tensor<double, 3>& field) {
+//     std::cout << "calling calculate_scalar_gradient" << std::endl;
+
+//     Tensor<double, 4> grad(3, grid.cells[0], grid.cells[1], grid.cells2);
+//     // print_tensor("field", &field);
+//     // print_tensor_map("scalarField_real0", *scalarField_real);
+//     // // Zero out the extended part of scalarField_real
+//     // scalarField_real->slice(Eigen::array<int, 3>({grid.cells[0], 0, 0}),
+//     //                        Eigen::array<int, 3>({grid.cells0_reduced*2-grid.cells[0], grid.cells[1], grid.cells2}))
+//     //     .setConstant(0);
+//     // // Copy field to the first part of scalarField_real
+//     // scalarField_real->slice(Eigen::array<int, 3>({0, 0, 0}),
+//     //                        Eigen::array<int, 3>({grid.cells[0], grid.cells[1], grid.cells2})) = field;
+//     // print_tensor_map("scalarField_real1", *scalarField_real);
+
+//     // // Perform forward FFT
+//     // fftw_mpi_execute_dft_r2c(plan_scalar_forth, scalarField_real->data(), scalarField_fourier_fftw);
+//     // print_tensor_map("scalarField_real2", *scalarField_real);
+//     // print_tensor_map("scalarField_fourier", *scalarField_fourier);
+
+//     // // Multiply scalarField_fourier by xi1st
+//     // for (int j = 0; j < grid.cells[1]; ++j) {
+//     //     for (int k = 0; k < grid.cells[2]; ++k) {
+//     //         for (int i = 0; i < grid.cells2; ++i) {
+//     //             for (int l = 0; l < 3; ++l) {
+//     //                 (*vectorField_fourier)(l, i, k, j) = (*scalarField_fourier)(i, k, j) * xi1st(l, i, k, j);
+//     //             }
+//     //         }
+//     //     }
+//     // }
+
+//     // // // Perform backward FFT
+//     // // fftw_mpi_execute_dft_c2r(planVectorBack, vectorField_fourier.data(), vectorField_real.data());
+
+//     // // // Multiply vectorField_real by wgt and extract the relevant portion
+//     // // Tensor<double, 4> grad(3, grid.cells[0], grid.cells[1], grid.cells[2]);
+//     // // grad = vectorField_real.slice(Eigen::array<int, 4>({0, 0, 0, 0}),
+//     // //                               Eigen::array<int, 4>({3, grid.cells[0], grid.cells[1], grid.cells[2]})) *
+//     // //        wgt;
+
+//     return grad;
+// }

@@ -7,14 +7,41 @@
 #include "init_environments.hpp"
 
 #include <unsupported/Eigen/CXX11/Tensor>
+#include <fftw3-mpi.h>
 
 #include <test/complex_concatenator.h>
 #include <tensor_operations.h>
 #include <helper.h>
 
+TEST(TestFFT, TestInitForwardBackward) {
+  fftw_mpi_init();
+  std::array<int, 3> cells = {2, 1, 1};
+  std::vector<int> extra_dims = {3, 3};
+  FFT<5> fft_obj;
+  ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
+  fft_obj.init_fft(cells, 1, extra_dims, 0, &cells1_fftw, &cells1_offset, &cells2_fftw);
+  Eigen::Tensor<double, 5> field_real_test(3,3,2,1,1);
+  field_real_test.setRandom();
+  fft_obj.set_field_real(field_real_test);
+  fft_obj.forward();
 
+  Eigen::Tensor<std::complex<double>, 5> tensorField_fourier = fft_obj.get_field_fourier();
+  for (int i = 0; i < tensorField_fourier.size(); ++i) {
+    if (std::abs(tensorField_fourier.data()[i].real() - 1.0) < 1e-12) {
+      std::cerr << "Mismatch avg tensorField FFT <-> real" << std::endl;
+      exit(-1);
+    }
+  }
 
-TEST_F(SimpleGridSetup,SpectralTestInit) {
+  double wgt = 0.5;
+  fft_obj.backward(wgt);
+  Eigen::Tensor<double, 5> tensorField_real_after = fft_obj.get_field_real().slice(
+    Eigen::array<Eigen::Index, 5>({0,0,0,0,0}), 
+    Eigen::array<Eigen::Index, 5>({3,3,2,1,1}));
+  EXPECT_TRUE(tensor_eq(field_real_test, tensorField_real_after));
+}
+
+TEST_F(SimpleGridSetup, SpectralTestInit) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   gridSetup_init_discretization();
   Spectral spectral(config, *mock_grid);
@@ -171,6 +198,7 @@ TEST_F(SimpleGridSetup, SpectralTestConstitutiveResponse) {
     {{{  131                     }}, {{  1.9762625833649862e-323 }}},
     {{{  4.680306608333713e-310  }}, {{  4.9406564584124654e-324 }}}}
   });
+  Eigen::TensorMap<Eigen::Tensor<double, 5>> P_map(P.data(), 3, 3, mock_grid->cells[0], mock_grid->cells[1], mock_grid->cells[2]);
 
   Eigen::Tensor<double, 2> P_av(3, 3);
   P_av.setZero();
@@ -187,6 +215,8 @@ TEST_F(SimpleGridSetup, SpectralTestConstitutiveResponse) {
    {{{{  0 }}, {{  0 }}}, {{{  1 }}, {{  1 }}}, {{{  0 }}, {{  0 }}}},
    {{{{  0 }}, {{  0 }}}, {{{  0 }}, {{  0 }}}, {{{  1 }}, {{  1 }}}}
   });
+  Eigen::TensorMap<Eigen::Tensor<double, 5>> F_map(F.data(), 3, 3, mock_grid->cells[0], mock_grid->cells[1], mock_grid->cells[2]);
+
 
   double delta_t = 0;
 
@@ -243,7 +273,7 @@ TEST_F(SimpleGridSetup, SpectralTestConstitutiveResponse) {
      {  563112007.26521027,  129438931.77348542,  157162202178.17346 }}}
   });
 
-  spectral.constitutive_response(P, P_av, C_vol_avg, C_minmax_avg, F, delta_t);
+  spectral.constitutive_response(P_map, P_av, C_vol_avg, C_minmax_avg, F_map, delta_t);
   EXPECT_TRUE(tensor_eq(C_vol_avg, expected_C_vol_avg));
 }
 

@@ -23,31 +23,50 @@ extern "C" {
   void f_homogenization_mechanical_response2(double* Delta_t, int* FEsolving_execIP, int* FEsolving_execElem);
 }
 
+template <int Rank>
+class FFT {
+public:
+  void init_fft(std::array<int, 3>& cells,
+                int cells2,
+                std::vector<int>& extra_dims,
+                int fftw_planner_flag,
+                ptrdiff_t* cells1_fftw = nullptr,
+                ptrdiff_t* cells1_offset = nullptr,
+                ptrdiff_t* cells2_fftw = nullptr);
+  void set_field_real(Eigen::Tensor<double, Rank> &field_real_);
+  void set_field_fourier(Eigen::Tensor<complex<double>, Rank> &field_fourier_);
+  Eigen::Tensor<double, Rank> get_field_real();
+  Eigen::Tensor<complex<double>, Rank> get_field_fourier();
+  void forward();
+  void backward(double &wgt);
+
+protected:
+  
+  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>> field_real;
+  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<complex<double>, Rank>>> field_fourier;
+  fftw_complex* field_fourier_fftw;
+  fftw_plan plan_forth;
+  fftw_plan plan_back;
+
+  Eigen::array<Eigen::Index, Rank> indices_nullify_start;
+  Eigen::array<Eigen::Index, Rank> indices_nullify_extents;
+  Eigen::array<Eigen::Index, Rank> indices_values_start;
+  Eigen::array<Eigen::Index, Rank> indices_values_extents_real;
+  Eigen::array<Eigen::Index, Rank> indices_values_extents_fourier;
+};
+
 class Spectral {
 public:
   Spectral(Config& config_, DiscretizationGrid& grid_)
       : config(config_), grid(grid_) {}
 
   void init();
-  template <int Rank>
-  void set_up_fftw(ptrdiff_t& cells1_fftw, 
-                    ptrdiff_t& cells1_offset, 
-                    ptrdiff_t& cells2_fftw,
-                    int size,
-                    std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>>& field_real,
-                    std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>>& field_fourier,
-                    fftw_complex*& field_fourier_fftw,
-                    int fftw_planner_flag,
-                    fftw_plan &plan_forth, 
-                    fftw_plan &plan_back,
-                    const std::string& label);
   virtual std::array<std::complex<double>, 3> get_freq_derivative(std::array<int, 3>& k_s);
-
-  virtual void constitutive_response (Tensor<double, 5> &P, 
+  virtual void constitutive_response (TensorMap<Tensor<double, 5>> &P,
                                       Tensor<double, 2> &P_av, 
                                       Tensor<double, 4> &C_volAvg, 
                                       Tensor<double, 4> &C_minMaxAvg,
-                                      Tensor<double, 5> &F,
+                                      TensorMap<Tensor<double, 5>> &F,
                                       double Delta_t,
                                       std::optional<Eigen::Quaterniond> rot_bc_q = std::nullopt);   
 

@@ -3,7 +3,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <discretization_grid.h>
-#include <spectral/spectral.h>
+#include "spectral/spectral.h"
 #include "spectral/mech/utilities.h"
 #include <config.h>
 #include <petsc.h>
@@ -68,20 +68,20 @@ public:
                         sharedNodesBegin);
   }
   void gridSetup_init_tensorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid) {
-    ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
-    spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
-                       spectral.tensorField_real, spectral.tensorField_fourier, spectral.tensorField_fourier_fftw,
-                       FFTW_MEASURE, spectral.plan_tensor_forth, spectral.plan_tensor_back,
-                       "tensor");
-    mock_grid.cells1_tensor = cells1_fftw;
-    mock_grid.cells1_offset_tensor = cells1_offset;
+    // ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
+    // spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
+    //                    spectral.tensorField_real, spectral.tensorField_fourier, spectral.tensorField_fourier_fftw,
+    //                    FFTW_MEASURE, spectral.plan_tensor_forth, spectral.plan_tensor_back,
+    //                    "tensor");
+    // mock_grid.cells1_tensor = cells1_fftw;
+    // mock_grid.cells1_offset_tensor = cells1_offset;
   }
   void gridSetup_init_vectorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid){
-    ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
-    spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
-                       spectral.vectorField_real, spectral.vectorField_fourier, spectral.vectorField_fourier_fftw,
-                       FFTW_MEASURE, spectral.plan_vector_forth, spectral.plan_vector_back,
-                       "vector");
+    // ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
+    // spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
+    //                    spectral.vectorField_real, spectral.vectorField_fourier, spectral.vectorField_fourier_fftw,
+    //                    FFTW_MEASURE, spectral.plan_vector_forth, spectral.plan_vector_back,
+    //                    "vector");
   }
 };
 
