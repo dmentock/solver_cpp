@@ -26,22 +26,35 @@ extern "C" {
 template <int Rank>
 class FFT {
 public:
-  void init_fft(std::array<int, 3>& cells,
-                int cells2,
-                std::vector<int>& extra_dims,
-                int fftw_planner_flag,
-                ptrdiff_t* cells1_fftw = nullptr,
-                ptrdiff_t* cells1_offset = nullptr,
-                ptrdiff_t* cells2_fftw = nullptr);
-  void set_field_real(Eigen::Tensor<double, Rank> &field_real_);
-  void set_field_fourier(Eigen::Tensor<complex<double>, Rank> &field_fourier_);
-  Eigen::Tensor<double, Rank> get_field_real();
-  Eigen::Tensor<complex<double>, Rank> get_field_fourier();
-  void forward();
-  void backward(double &wgt);
+  FFT(std::array<int, 3>& cells,
+      int cells2,
+      std::vector<int>& extra_dims,
+      int fftw_planner_flag,
+      ptrdiff_t* cells1_fftw = nullptr,
+      ptrdiff_t* cells1_offset = nullptr,
+      ptrdiff_t* cells2_fftw = nullptr) {
+    init_fft(cells, cells2, extra_dims, fftw_planner_flag, cells1_fftw, cells1_offset, cells2_fftw);
+  }
+    void set_field_real(Eigen::Tensor<double, Rank> &field_real_);
+    void set_field_fourier(Eigen::Tensor<complex<double>, Rank> &field_fourier_);
+    Eigen::Tensor<double, Rank> get_field_real();
+    Eigen::Tensor<complex<double>, Rank> get_field_fourier();
 
-protected:
-  
+    template <typename TensorType>
+    Eigen::Tensor<std::complex<double>, Rank>* forward(TensorType* field_real_, bool in_place = false) {
+        if (field_real_->data() != field_real->data()) {
+      field_real->slice(indices_nullify_start, indices_nullify_extents).setZero();
+      field_real->slice(indices_values_start, indices_values_extents_real) = *field_real_;
+    }
+    fftw_mpi_execute_dft_r2c(plan_forth, field_real->data(), field_fourier_fftw);
+    if (in_place) {
+      Eigen::Tensor<std::complex<double>, Rank>* field_fourier_copy = new Eigen::Tensor<std::complex<double>, Rank>(field_fourier->data(), field_fourier->dimensions());
+      return field_fourier_copy;
+    } else {
+      Eigen::Tensor<std::complex<double>, Rank>* field_fourier_copy = new Eigen::Tensor<std::complex<double>, Rank>(*field_fourier);
+      return field_fourier_copy;
+    }
+  }
   std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>> field_real;
   std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<complex<double>, Rank>>> field_fourier;
   fftw_complex* field_fourier_fftw;
