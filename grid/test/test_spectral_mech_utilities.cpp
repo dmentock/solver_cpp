@@ -14,10 +14,9 @@
 #include "tensor_operations.h"
 #include "helper.h"
 
-TEST_F(SimpleGridSetup, MechUtilitiesTestInit) {
+TEST_F(GridTestSetup, MechUtilitiesTestInit) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
-  gridSetup_init_tensorfield(spectral, *mock_grid);
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
 
@@ -34,7 +33,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestInit) {
   // TODO: mock calls to set_up_fftw template function
 }
 
-TEST_F(SimpleGridSetup,MechUtilitiesTestInitDivergenceCorrection) {
+TEST_F(GridTestSetup,MechUtilitiesTestInitDivergenceCorrection) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   mock_grid->geom_size = std::array<double, 3>{3,4,5};
@@ -56,13 +55,12 @@ TEST_F(SimpleGridSetup,MechUtilitiesTestInitDivergenceCorrection) {
   ASSERT_EQ(mock_grid->scaled_geom_size, expected_scaled_geom_size_2);
 }
 
-TEST_F(SimpleGridSetup, MechUtilitiesTestUpdateCoords) {
+TEST_F(GridTestSetup, MechUtilitiesTestUpdateCoords) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
-
-  gridSetup_init_tensorfield(spectral, *mock_grid);
-  gridSetup_init_vectorfield(spectral, *mock_grid);
   spectral.wgt = 0.5;
+  spectral.tensorfield.reset(gridTestSetup_init_fft<5>(*mock_grid));
+  spectral.vectorfield.reset(gridTestSetup_init_fft<4>(*mock_grid));
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
 
@@ -104,7 +102,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestUpdateCoords) {
   EXPECT_TRUE(tensor_eq(x_p, expected_x_p));
 }
 
-TEST_F(SimpleGridSetup, TestUpdateGamma) {
+TEST_F(GridTestSetup, TestUpdateGamma) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
@@ -149,7 +147,7 @@ TEST_F(SimpleGridSetup, TestUpdateGamma) {
   // TODO: find testcases that cause gamma fluctuation
 }
 
-TEST_F(SimpleGridSetup, MechUtilitiesTestForwardField) {
+TEST_F(GridTestSetup, MechUtilitiesTestForwardField) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
@@ -191,7 +189,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestForwardField) {
   EXPECT_TRUE(tensor_eq(forwarded_field, expected_forwarded_field));
 }
 
-TEST_F(SimpleGridSetup, MechUtilitiesTestMaskedCompliance) {
+TEST_F(GridTestSetup, MechUtilitiesTestMaskedCompliance) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
@@ -277,10 +275,10 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestMaskedCompliance) {
   // TODO: Find more understandable test setup
 }
 
-TEST_F(SimpleGridSetup, MechUtilitiesTestDivergenceRMS) {
+TEST_F(GridTestSetup, MechUtilitiesTestDivergenceRMS) {
   gridSetup_init_grid(std::array<int, 3>{4,1,1}); // use larger grid to enter if branch
   Spectral spectral(config, *mock_grid);
-  gridSetup_init_tensorfield(spectral, *mock_grid);
+  spectral.tensorfield.reset(gridTestSetup_init_fft<5>(*mock_grid));
   spectral.wgt = 0.25;
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
@@ -342,10 +340,10 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestDivergenceRMS) {
   // TODO: Add test for diverging
 }
 
-TEST_F(SimpleGridSetup, MechUtilitiesTestGammaConvolution) {
+TEST_F(GridTestSetup, MechUtilitiesTestGammaConvolution) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
-  gridSetup_init_tensorfield(spectral, *mock_grid);
+  spectral.tensorfield.reset(gridTestSetup_init_fft<5>(*mock_grid));
 
   MechUtilities mech_utilities(config, *mock_grid, spectral);
 
@@ -442,7 +440,7 @@ TEST_F(SimpleGridSetup, MechUtilitiesTestGammaConvolution) {
   config.num_grid.memory_efficient = 1;
   Eigen::Tensor<double, 5> gamma_field1 = mech_utilities.gamma_convolution(field, field_aim);
   EXPECT_TRUE(tensor_eq(gamma_field1, expected_gamma_field));
-  //TODO: add test where det of A is large enough to enter if branch for memory_efficient=1
+  // TODO: add test where det of A is large enough to enter if branch for memory_efficient=1
 }
 
 int main(int argc, char **argv) {

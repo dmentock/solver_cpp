@@ -41,7 +41,7 @@ class MockDiscretizedGrid : public DiscretizationGrid {
   }
 };
 
-class SimpleGridSetup : public ::testing::Test {
+class GridTestSetup : public ::testing::Test {
 protected:
   std::unique_ptr<MockDiscretizedGrid> mock_grid;
   Config config;
@@ -67,21 +67,13 @@ public:
                         nodes0.data(), nodes0.dimension(1),
                         sharedNodesBegin);
   }
-  void gridSetup_init_tensorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid) {
-    // ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
-    // spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
-    //                    spectral.tensorField_real, spectral.tensorField_fourier, spectral.tensorField_fourier_fftw,
-    //                    FFTW_MEASURE, spectral.plan_tensor_forth, spectral.plan_tensor_back,
-    //                    "tensor");
-    // mock_grid.cells1_tensor = cells1_fftw;
-    // mock_grid.cells1_offset_tensor = cells1_offset;
-  }
-  void gridSetup_init_vectorfield(Spectral& spectral, MockDiscretizedGrid& mock_grid){
-    // ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
-    // spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
-    //                    spectral.vectorField_real, spectral.vectorField_fourier, spectral.vectorField_fourier_fftw,
-    //                    FFTW_MEASURE, spectral.plan_vector_forth, spectral.plan_vector_back,
-    //                    "vector");
+
+  template <int Rank>
+  FFT<Rank>* gridTestSetup_init_fft (MockDiscretizedGrid& mock_grid) {
+    ptrdiff_t cells2_fftw, cells1_fftw, cells1_offset;
+    std::vector<int> extra_dims = {3, 3};
+    FFT<Rank>* fft_obj = new FFT<Rank>(mock_grid.cells, mock_grid.cells2, extra_dims, 0, &cells1_fftw, &cells1_offset, &cells2_fftw);
+    return fft_obj;
   }
 };
 

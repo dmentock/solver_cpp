@@ -40,26 +40,49 @@ public:
     Eigen::Tensor<double, Rank> get_field_real();
     Eigen::Tensor<complex<double>, Rank> get_field_fourier();
 
-    template <typename TensorType>
-    Eigen::Tensor<std::complex<double>, Rank>* forward(TensorType* field_real_, bool in_place = false) {
-        if (field_real_->data() != field_real->data()) {
+
+  template <typename TensorType>
+  Eigen::Tensor<std::complex<double>, Rank> forward(TensorType* field_real_) {
+    if (field_real_->data() != field_real->data()) {
       field_real->slice(indices_nullify_start, indices_nullify_extents).setZero();
       field_real->slice(indices_values_start, indices_values_extents_real) = *field_real_;
     }
     fftw_mpi_execute_dft_r2c(plan_forth, field_real->data(), field_fourier_fftw);
-    if (in_place) {
-      Eigen::Tensor<std::complex<double>, Rank>* field_fourier_copy = new Eigen::Tensor<std::complex<double>, Rank>(field_fourier->data(), field_fourier->dimensions());
-      return field_fourier_copy;
-    } else {
-      Eigen::Tensor<std::complex<double>, Rank>* field_fourier_copy = new Eigen::Tensor<std::complex<double>, Rank>(*field_fourier);
-      return field_fourier_copy;
-    }
+    Eigen::TensorMap<Eigen::Tensor<complex<double>, Rank>> field_fourier_map = *field_fourier;
+    Eigen::Tensor<complex<double>, Rank> field_fourier_ = field_fourier_map;
+    return field_fourier_.slice(indices_values_start, indices_values_extents_fourier);
   }
+
+  template <typename TensorType>
+  Eigen::Tensor<double, Rank> backward(TensorType* field_fourier_, double &wgt) {
+    if (field_fourier_->data() != field_fourier->data()) {
+      field_fourier->slice(indices_values_start, indices_values_extents_fourier) = *field_fourier_;
+    }
+    fftw_mpi_execute_dft_c2r(plan_back, field_fourier_fftw, field_real->data());
+    Eigen::TensorMap<Eigen::Tensor<double, Rank>> field_real_map = *field_real;
+    Eigen::Tensor<double, Rank> field_real_ = field_real_map * wgt;
+    return field_real_.slice(indices_values_start, indices_values_extents_real);
+  }
+
+
   std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>> field_real;
   std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<complex<double>, Rank>>> field_fourier;
+
+protected:
+    void init_fft(std::array<int, 3>& cells,
+                int cells2,
+                std::vector<int>& extra_dims,
+                int fftw_planner_flag,
+                ptrdiff_t* cells1_fftw = nullptr,
+                ptrdiff_t* cells1_offset = nullptr,
+                ptrdiff_t* cells2_fftw = nullptr);
+
   fftw_complex* field_fourier_fftw;
   fftw_plan plan_forth;
   fftw_plan plan_back;
+
+  Eigen::array<ptrdiff_t, Rank> dims_real;
+  Eigen::array<ptrdiff_t, Rank> dims_fourier;
 
   Eigen::array<Eigen::Index, Rank> indices_nullify_start;
   Eigen::array<Eigen::Index, Rank> indices_nullify_extents;
@@ -88,7 +111,7 @@ public:
     double* homogenization_F_ptr;
     double* homogenization_P_ptr;
     double* homogenization_dPdF_ptr;
-    void* raw_terminally_ill_ptr; 
+    void* raw_terminally_ill_ptr;
     f_homogenization_fetch_tensor_pointers (&homogenization_F0_ptr, &homogenization_F_ptr, 
                                             &homogenization_P_ptr, &homogenization_dPdF_ptr,
                                             &raw_terminally_ill_ptr);
@@ -111,25 +134,14 @@ public:
   std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 5>>> homogenization_dPdF;
   bool* terminally_ill;
 
-  double wgt;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 5>>> tensorField_real;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 5>>> tensorField_fourier;
-  fftw_complex* tensorField_fourier_fftw;
-  fftw_plan plan_tensor_forth;
-  fftw_plan plan_tensor_back;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 4>>> vectorField_real;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 4>>> vectorField_fourier;
-  fftw_complex* vectorField_fourier_fftw;
-  fftw_plan plan_vector_forth;
-  fftw_plan plan_vector_back;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 3>>> scalarField_real;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 3>>> scalarField_fourier;
-  fftw_complex* scalarField_fourier_fftw;
-  fftw_plan plan_scalar_forth;
-  fftw_plan plan_scalar_back;
+  double wgt = 0.5;
+  
   Eigen::Tensor<std::complex<double>, 4> xi1st;
   Eigen::Tensor<std::complex<double>, 4> xi2nd;
 
+  std::unique_ptr<FFT<3>> scalarfield;
+  std::unique_ptr<FFT<4>> vectorfield;
+  std::unique_ptr<FFT<5>> tensorfield;
 protected:
   DiscretizationGrid& grid;
   Config& config;

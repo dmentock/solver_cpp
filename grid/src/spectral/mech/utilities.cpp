@@ -40,23 +40,20 @@ void MechUtilities::init_utilities(){
     gamma_hat.resize(3, 3, 3, 3, 1, 1, 1);
   } else {
     gamma_hat.resize(3,3,3,3,grid.cells0_reduced,grid.cells[2],grid.cells1_tensor);
-      gamma_hat.setZero();
+    gamma_hat.setZero();
   }
 }
 
 void MechUtilities::update_coords(Tensor<double, 5> &F, Tensor<double, 2>& x_n_, Tensor<double, 2>& x_p_) {
-  spectral.tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
-      Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2})).device(Eigen::DefaultDevice{}) = F;
-  spectral.tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}),
-      Eigen::array<Eigen::Index, 5>({3, 3, grid.cells0_reduced*2-grid.cells[0], grid.cells[1], grid.cells2})).setConstant(0);
-  fftw_mpi_execute_dft_r2c(spectral.plan_tensor_forth, spectral.tensorField_real->data(), spectral.tensorField_fourier_fftw);
+  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&F);
 
   // Average F
   Tensor<double, 2> Favg(3, 3);
   if (grid.cells1_offset_tensor == 0) {
-    auto sliced_tensor = spectral.tensorField_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
-                                                             Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1}));
-    Favg = sliced_tensor.real().reshape(Eigen::array<Eigen::Index, 2>({3, 3})) * spectral.wgt;
+    Tensor<std::complex<double>, 5> tensor_slice = tensorfield_fourier.slice(
+      Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
+      Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1}));
+    Favg = tensor_slice.real().reshape(Eigen::array<Eigen::Index, 2>({3, 3})) * spectral.wgt;
   }
 
   // Integration in Fourier space to get fluctuations of cell center displacements
@@ -65,7 +62,7 @@ void MechUtilities::update_coords(Tensor<double, 5> &F, Tensor<double, 2>& x_n_,
       for (int i = 0; i < grid.cells0_reduced ; ++i) {
         std::array<int, 3> indices = {i, j + grid.cells1_offset_tensor, k};
         if (std::any_of(indices.begin(), indices.end(), [](int x) { return x != 0; })) {
-          Tensor<complex<double>, 2> tensor_slice = spectral.tensorField_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, i, k, j}),
+          Tensor<complex<double>, 2> tensor_slice = tensorfield_fourier.slice(Eigen::array<Index, 5>({0, 0, i, k, j}),
                                   Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 2>({3, 3}));
           Tensor<complex<double>, 1>  xi2_slice = spectral.xi2nd.slice(Eigen::array<Eigen::Index, 4>({0, i, k, j}),
               Eigen::array<Eigen::Index, 4>({3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 1>({3}));
@@ -74,24 +71,20 @@ void MechUtilities::update_coords(Tensor<double, 5> &F, Tensor<double, 2>& x_n_,
           Eigen::Array<complex<double>, 3, 1> xi2_array;
           for (Eigen::Index l = 0; l < 3; ++l) xi2_array(l) = -xi2_slice(l);
           complex<double> denominator = (xi2_array.conjugate() * xi2_array).sum();
-          for (Eigen::Index l = 0; l < 3; ++l) (*spectral.vectorField_fourier)(l,i,k,j) = result(l)/denominator;
+          for (Eigen::Index l = 0; l < 3; ++l) (*spectral.vectorfield->field_fourier)(l,i,k,j) = result(l)/denominator;
         } else {
-          Tensor<complex<double>, 4> zero_tensor(3, 1, 1, 1);
-          spectral.vectorField_fourier->slice(Eigen::array<Eigen::Index, 4>({0, i, k, j}),
-                                              Eigen::array<Eigen::Index, 4>({3, 1, 1, 1})).setZero();
+          (*spectral.vectorfield->field_fourier).slice(Eigen::array<Eigen::Index, 4>({0, i, k, j}),
+                                                       Eigen::array<Eigen::Index, 4>({3, 1, 1, 1})).setZero();
         }
       }
     }
   }
-  fftw_mpi_execute_dft_c2r (spectral.plan_vector_back, 
-                            spectral.vectorField_fourier_fftw, 
-                            spectral.vectorField_real->data());
-
+  Tensor<double, 4> vectorfield_real = spectral.vectorfield->backward((spectral.vectorfield->field_fourier).get(), spectral.wgt);
   Tensor<double, 4> u_tilde_p_padded(3,grid.cells[0],grid.cells[1],grid.cells2+2);
-  u_tilde_p_padded.slice(Eigen::array<Eigen::Index, 4>({0, 0, 0, 1}),
+  u_tilde_p_padded.slice (Eigen::array<Eigen::Index, 4>({0, 0, 0, 1}),
                           Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2})) = 
-  spectral.vectorField_real->slice (Eigen::array<Eigen::Index, 4>({0, 0, 0, 0}),
-                                    Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2}))*spectral.wgt;
+  vectorfield_real.slice (Eigen::array<Eigen::Index, 4>({0, 0, 0, 0}),
+                          Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2}))*spectral.wgt;
 
   // Pad cell center fluctuations along z-direction (needed when running MPI simulation)
   int c = 3 * grid.cells[0] * grid.cells[1]; // amount of data to transfer
@@ -314,15 +307,7 @@ void MechUtilities::calculate_masked_compliance( Tensor<double, 4> &C,
 }
 
 double MechUtilities::calculate_divergence_rms(const Tensor<double, 5>& tensor_field) {
-
-  spectral.tensorField_real->slice(
-    Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}), 
-    Eigen::array<Eigen::Index, 5>({3, 3, grid.cells0_reduced * 2 - grid.cells[0], grid.cells[1], grid.cells2}))
-    .setZero();
-  spectral.tensorField_real->slice(
-    Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}),
-    Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2})) = tensor_field;
-  fftw_mpi_execute_dft_r2c(spectral.plan_tensor_forth, spectral.tensorField_real->data(), spectral.tensorField_fourier_fftw);
+  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&tensor_field);
 
   Eigen::Vector3cd rescaled_geom;
   for (int i = 0; i < 3; ++i) rescaled_geom[i] = complex<double>(grid.geom_size[i] / grid.scaled_geom_size[i], 0);
@@ -335,32 +320,19 @@ double MechUtilities::calculate_divergence_rms(const Tensor<double, 5>& tensor_f
   for (int j = 0; j < grid.cells2; ++j) {
     for (int k = 0; k < grid.cells[2]; ++k) {
       for (int i = 1; i < grid.cells0_reduced - 1; ++i) {
-        tensorField_fourier_slice_ =  (*spectral.tensorField_fourier).chip(j, 4).chip(k,3).chip(i,2)
+        tensorField_fourier_slice_ =  tensorfield_fourier.chip(j, 4).chip(k,3).chip(i,2)
               .slice(Eigen::array<Eigen::Index, 2>({0,0}), Eigen::array<Eigen::Index, 2>({3,3}));
         tensorField_fourier_slice = tensorField_fourier_slice; //create copy to generate continuous storage of data
         Eigen::Map<const Eigen::Matrix<complex<double>, 3, 3>> tensorField_fourier_mat(tensorField_fourier_slice_.data());
         xi1st_slice = -spectral.xi1st.chip(j, 3).chip(k, 2).chip(i, 1);
-        xi1st_slice_ = xi1st_slice; //create copy to generate continuous storage of data
+        xi1st_slice_ = xi1st_slice;
         Eigen::Map<Eigen::Vector3cd> xi1st_vec(xi1st_slice_.data());
         product = tensorField_fourier_mat * ((xi1st_vec.conjugate().array() * rescaled_geom.array()).matrix());
-        // std::cout << "scaled " << rescaled_geom[0] << " " << rescaled_geom[1] << " " << rescaled_geom[2] << " " << std::endl;
-        // std::cout << "xi1st_slice "<< std::setprecision(17) << -spectral.xi1st.chip(j, 3).chip(k,2).chip(i,1) << std::endl;
-        // std::cout << "conjg xi1st_slice "<< std::setprecision(17) << xi1st_vec.conjugate() << std::endl;
-        // std::cout << "conjg xi1st_slice scaled"<< std::setprecision(17) << xi1st_vec.conjugate().array() * rescaled_geom.array() << std::endl;
-        // // std::cout << "conjg xi1st_slice scaled"<< std::setprecision(17) << result << std::endl;
-        // std::cout << "fourier_slice "<< std::setprecision(17) << tensorField_fourier_mat << std::endl;
-        // std::cout << "matmul "<< std::setprecision(17) << product  << std::endl;
-        // std::cout << "power " << product.real().array().square() << std::endl;
-        // std::cout << "power i" << product.imag().array().square() << std::endl;
-        // std::cout << "sum " << product.real().array().square().sum() << std::endl;
-        // std::cout << "sum i " << product.imag().array().square().sum() << std::endl;
-        // sum with c++ eigen produces a slightly different result than the inbuilt fortran library 
-        // (c++: 8776197.1903837956, fortran: 8776197.1903837975)
         rms += 2*(product.real().array().square().sum() + product.imag().array().square().sum());
       }
       std::vector<int> indeces = {0, grid.cells0_reduced-1};
       for (int i : indeces) {
-        tensorField_fourier_slice_ =  (*spectral.tensorField_fourier).chip(j, 4).chip(k,3).chip(i,2)
+        tensorField_fourier_slice_ =  tensorfield_fourier.chip(j, 4).chip(k,3).chip(i,2)
               .slice(Eigen::array<Eigen::Index, 2>({0,0}), Eigen::array<Eigen::Index, 2>({3,3}));
         tensorField_fourier_slice = tensorField_fourier_slice; //create copy to generate continuous storage of data
         Eigen::Map<const Eigen::Matrix<complex<double>, 3, 3>> tensorField_fourier_mat(tensorField_fourier_slice_.data());
@@ -380,15 +352,7 @@ double MechUtilities::calculate_divergence_rms(const Tensor<double, 5>& tensor_f
 
 Tensor<double, 5> MechUtilities::gamma_convolution(Tensor<double, 5> &field, Tensor<double, 2> &field_aim){
 
-  spectral.tensorField_real->slice(
-    Eigen::array<Eigen::Index, 5>({0, 0, grid.cells[0], 0, 0}), 
-    Eigen::array<Eigen::Index, 5>({3, 3, grid.cells0_reduced, grid.cells[1], grid.cells2})).setConstant(0);
-  spectral.tensorField_real->slice(
-    Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}), 
-    Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2})) = field;
-
-  fftw_mpi_execute_dft_r2c(spectral.plan_tensor_forth, spectral.tensorField_real->data(), spectral.tensorField_fourier_fftw);
-
+  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&field);
   Eigen::Matrix<complex<double>, 3, 3> temp33_cmplx;
   if (config.num_grid.memory_efficient) {
     Eigen::Matrix<double, 6, 6> A;
@@ -400,26 +364,26 @@ Tensor<double, 5> MechUtilities::gamma_convolution(Tensor<double, 5> &field, Ten
         for (int i = 0; i < grid.cells0_reduced; ++i) {
           if (!(i == 0 && j + grid.cells1_offset_tensor == 0 && k == 0)) { // singular point at xi=(0.0,0.0,0.0) i.e. i=j=k=1
             for (int l = 0; l < 3; ++l) {
-                for (int m = 0; m < 3; ++m) {
-                    xiDyad_cmplx(l, m) = std::conj(-spectral.xi1st(l, i, k, j)) * spectral.xi1st(m, i, k, j);
-                }
+              for (int m = 0; m < 3; ++m) {
+                xiDyad_cmplx(l, m) = std::conj(-spectral.xi1st(l, i, k, j)) * spectral.xi1st(m, i, k, j);
+              }
             }
             for (int l = 0; l < 3; ++l) {
-                for (int m = 0; m < 3; ++m) {
-                    for (int n = 0; n < 3; ++n) {
-                        for (int o = 0; o < 3; ++o) {
-                            temp33_cmplx(l, m) += complex<double>(C_ref(l, n, m, o)) * xiDyad_cmplx(n, o);
-                        }
-                    }
+              for (int m = 0; m < 3; ++m) {
+                for (int n = 0; n < 3; ++n) {
+                  for (int o = 0; o < 3; ++o) {
+                    temp33_cmplx(l, m) += complex<double>(C_ref(l, n, m, o)) * xiDyad_cmplx(n, o);
+                  }
                 }
+              }
             }
             A.block(0, 0, 3, 3) = temp33_cmplx.real();
             A.block(3, 3, 3, 3) = temp33_cmplx.real();
             A.block(0, 3, 3, 3) = temp33_cmplx.imag();
             A.block(3, 0, 3, 3) = -temp33_cmplx.imag();
             // TODO: if det(A(1:3,1:3)> ...)
-            spectral.tensorField_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, i, k, j}),
-                                                Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1})).setConstant(complex<double>(0,0));
+            spectral.tensorfield->field_fourier->slice(Eigen::array<Eigen::Index, 5>({0, 0, i, k, j}),
+                                      Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1})).setConstant(complex<double>(0,0));
           }
         }
       }
@@ -435,7 +399,7 @@ Tensor<double, 5> MechUtilities::gamma_convolution(Tensor<double, 5> &field, Ten
                               .slice(Eigen::array<Eigen::Index, 2>({0,0}), Eigen::array<Eigen::Index, 2>({3,3}));
               Tensor<complex<double>, 2> gamma_hat_slice_ = gamma_hat_slice; //create copy to generate continuous storage of data
               Eigen::Map<const Eigen::Matrix<complex<double>, 3, 3>> gamma_hat_slice_mat(gamma_hat_slice_.data());
-              Tensor<complex<double>, 2> tensorField_fourier_slice = (*spectral.tensorField_fourier).chip(j, 4).chip(k,3).chip(i,2)
+              Tensor<complex<double>, 2> tensorField_fourier_slice = tensorfield_fourier.chip(j, 4).chip(k,3).chip(i,2)
                               .slice(Eigen::array<Eigen::Index, 2>({0,0}), Eigen::array<Eigen::Index, 2>({3,3}));
               Tensor<complex<double>, 2> tensorField_fourier_slice_ = tensorField_fourier_slice; //create copy to generate continuous storage of data
               Eigen::Map<const Eigen::Matrix<complex<double>, 3, 3>> tensorField_fourier_slice_mat(tensorField_fourier_slice_.data());
@@ -445,7 +409,7 @@ Tensor<double, 5> MechUtilities::gamma_convolution(Tensor<double, 5> &field, Ten
           }
           for (int l = 0; l < 3; ++l) {
             for (int m = 0; m < 3; ++m) {
-              (*spectral.tensorField_fourier)(l, m, i, k, j) = temp33_cmplx(l, m);
+              (*spectral.tensorfield->field_fourier)(l, m, i, k, j) = temp33_cmplx(l, m);
             }
           }
         }
@@ -455,13 +419,12 @@ Tensor<double, 5> MechUtilities::gamma_convolution(Tensor<double, 5> &field, Ten
   if (grid.cells2_offset==0) {
     for (int l = 0; l < 3; ++l) {
       for (int m = 0; m < 3; ++m) {
-        (*spectral.tensorField_fourier)(l, m, 0, 0, 0) = complex<double>(field_aim(l, m), 0);
+        (*spectral.tensorfield->field_fourier)(l, m, 0, 0, 0) = complex<double>(field_aim(l, m), 0);
       }
     }
   }
-  fftw_mpi_execute_dft_c2r(spectral.plan_tensor_back, spectral.tensorField_fourier_fftw, spectral.tensorField_real->data());
-  return spectral.tensorField_real->slice(Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}), 
-                                          Eigen::array<Eigen::Index, 5>({3, 3, grid.cells[0], grid.cells[1], grid.cells2}));
+  double neutral_wgt = 1;
+  return spectral.tensorfield->backward(spectral.tensorfield->field_fourier.get(), neutral_wgt);
 }
 
 

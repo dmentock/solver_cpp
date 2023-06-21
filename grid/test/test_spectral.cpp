@@ -8,40 +8,90 @@
 
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <fftw3-mpi.h>
+#include <random>
 
 #include <test/complex_concatenator.h>
 #include <tensor_operations.h>
 #include <helper.h>
 
-TEST(TestFFT, TestInitForwardBackward) {
+TEST(TestFFT, TestInitForwardBackwardCopy) {
   fftw_mpi_init();
   std::array<int, 3> cells = {2, 1, 1};
+  int cells2 = 1;
   std::vector<int> extra_dims = {3, 3};
-  FFT<5> fft_obj;
+  int fft_flag = 0;
   ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
-  fft_obj.init_fft(cells, 1, extra_dims, 0, &cells1_fftw, &cells1_offset, &cells2_fftw);
+  FFT<5> fft_obj(cells, cells2, extra_dims, fft_flag, &cells1_fftw, &cells1_offset, &cells2_fftw);
+
   Eigen::Tensor<double, 5> field_real_test(3,3,2,1,1);
   field_real_test.setRandom();
-  fft_obj.set_field_real(field_real_test);
-  fft_obj.forward();
+  Eigen::Tensor<std::complex<double>, 5> field_fourier_test = fft_obj.forward(&field_real_test);
 
-  Eigen::Tensor<std::complex<double>, 5> tensorField_fourier = fft_obj.get_field_fourier();
-  for (int i = 0; i < tensorField_fourier.size(); ++i) {
-    if (std::abs(tensorField_fourier.data()[i].real() - 1.0) < 1e-12) {
-      std::cerr << "Mismatch avg tensorField FFT <-> real" << std::endl;
-      exit(-1);
-    }
+  for (int i = 0; i < field_fourier_test.size(); ++i) {
+    EXPECT_TRUE(!(std::abs(field_fourier_test.data()[i].real() - 1.0) < 1e-12));
   }
 
   double wgt = 0.5;
-  fft_obj.backward(wgt);
-  Eigen::Tensor<double, 5> tensorField_real_after = fft_obj.get_field_real().slice(
-    Eigen::array<Eigen::Index, 5>({0,0,0,0,0}), 
-    Eigen::array<Eigen::Index, 5>({3,3,2,1,1}));
-  EXPECT_TRUE(tensor_eq(field_real_test, tensorField_real_after));
+  Eigen::Tensor<double, 5> field_real_test_ = fft_obj.backward(&field_fourier_test, wgt);
+  EXPECT_TRUE(tensor_eq(field_real_test, field_real_test_));
 }
 
-TEST_F(SimpleGridSetup, SpectralTestInit) {
+TEST(TestFFT, TestInitForwardBackwardDirectAssignment) {
+  fftw_mpi_init();
+  std::array<int, 3> cells = {2, 1, 1};
+  int cells2 = 1;
+  std::vector<int> extra_dims = {3, 3};
+  int fft_flag = 0;
+  ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
+  FFT<5> fft_obj(cells, cells2, extra_dims, fft_flag, &cells1_fftw, &cells1_offset, &cells2_fftw);
+
+  std::random_device rd;
+  std::mt19937 mt(rd());
+  std::uniform_real_distribution<double> dist(1.0, 1000.0);
+  for (int i = 0; i < fft_obj.field_real->size(); ++i) {
+    fft_obj.field_real->data()[i] = dist(mt);
+  }
+  Eigen::TensorMap<Eigen::Tensor<double, 5>> field_real_map = *fft_obj.field_real;
+  Eigen::Tensor<double, 5> field_real_copy = field_real_map.slice(
+    Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}), 
+    Eigen::array<Eigen::Index, 5>({3, 3, 2, 1, 1}));
+
+  Eigen::Tensor<std::complex<double>, 5> field_fourier_test = fft_obj.forward(fft_obj.field_real.get());
+  for (int i = 0; i < field_fourier_test.size(); ++i) {
+    EXPECT_TRUE(!(std::abs(field_fourier_test.data()[i].real() - 1.0) < 1e-12));
+  }
+
+  double wgt = 0.5;
+  Eigen::Tensor<double, 5> field_real_test_ = fft_obj.backward(&field_fourier_test, wgt);
+  EXPECT_TRUE(tensor_eq(field_real_test_, field_real_copy));
+}
+
+// TEST(TestFFT, TestInitForwardBackwardInPlace) {
+//   fftw_mpi_init();
+//   std::array<int, 3> cells = {2, 1, 1};
+//   int cells2 = 1;
+//   std::vector<int> extra_dims = {3, 3};
+//   int fft_flag = 0;
+//   ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
+//   FFT<5> fft_obj(cells, cells2, extra_dims, fft_flag, &cells1_fftw, &cells1_offset, &cells2_fftw);
+
+//   std::random_device rd;
+//   std::mt19937 mt(rd());
+//   std::uniform_real_distribution<double> dist(1.0, 1000.0);
+//   for (int i = 0; i < fft_obj.field_real->size(); ++i) {
+//     fft_obj.field_real->data()[i] = dist(mt);
+//   }
+//   Eigen::TensorMap<Eigen::Tensor<double, 5>> field_real_map = *fft_obj.field_real;
+//   Eigen::Tensor<double, 5> field_real_copy = field_real_map.slice(
+//     Eigen::array<Eigen::Index, 5>({0, 0, 0, 0, 0}), 
+//     Eigen::array<Eigen::Index, 5>({3, 3, 2, 1, 1}));
+
+//   std::shared_ptr<Eigen::TensorMap<Eigen::Tensor<std::complex<double>, 5>>> field_fourier_test = 
+//     fft_obj.forward(fft_obj.field_real.get(), true);    
+// }
+
+TEST_F(GridTestSetup, SpectralTestInit) {
+  
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   gridSetup_init_discretization();
   Spectral spectral(config, *mock_grid);
@@ -73,7 +123,7 @@ TEST_F(SimpleGridSetup, SpectralTestInit) {
   // TODO: mock calls to set_up_fftw template function
 }
 
-TEST_F(SimpleGridSetup, SpectralTestHomogenizationFetchTensors) {
+TEST_F(GridTestSetup, SpectralTestHomogenizationFetchTensors) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   gridSetup_init_discretization();
   f_homogenization_init();
@@ -82,7 +132,7 @@ TEST_F(SimpleGridSetup, SpectralTestHomogenizationFetchTensors) {
   f_deallocate_resources();
 }
 
-TEST_F(SimpleGridSetup, SpectralTestConstitutiveResponse) {
+TEST_F(GridTestSetup, SpectralTestConstitutiveResponse) {
   class PartialMockSpectral : public Spectral {
     public:
     PartialMockSpectral(Config& config_, DiscretizationGrid& grid_)
@@ -99,9 +149,9 @@ TEST_F(SimpleGridSetup, SpectralTestConstitutiveResponse) {
 
   PartialMockSpectral spectral(config, *mock_grid);
   spectral.homogenization_fetch_tensor_pointers();
-  gridSetup_init_tensorfield(spectral, *mock_grid);
 
   spectral.wgt = 0.5;
+  
   spectral.homogenization_dPdF->setValues({
    {{{{  159842489344.4433 ,  159972848994.13599 },
       { -1504219541.5565622, -1689836307.3836253 },
@@ -216,7 +266,6 @@ TEST_F(SimpleGridSetup, SpectralTestConstitutiveResponse) {
    {{{{  0 }}, {{  0 }}}, {{{  0 }}, {{  0 }}}, {{{  1 }}, {{  1 }}}}
   });
   Eigen::TensorMap<Eigen::Tensor<double, 5>> F_map(F.data(), 3, 3, mock_grid->cells[0], mock_grid->cells[1], mock_grid->cells[2]);
-
 
   double delta_t = 0;
 

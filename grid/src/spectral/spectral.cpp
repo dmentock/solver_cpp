@@ -37,13 +37,11 @@ void FFT<Rank>::init_fft (std::array<int, 3>& cells,
   
   std::vector<ptrdiff_t> dims_real_(extra_dims.begin(), extra_dims.end());
   dims_real_.insert(dims_real_.end(), {cells0_reduced * 2, cells[1], cells2});
-  Eigen::array<ptrdiff_t, Rank> dims_real;
   std::copy_n(dims_real_.begin(), Rank, dims_real.begin());
   field_real.reset(new Eigen::TensorMap<Eigen::Tensor<double, Rank>>(reinterpret_cast<double*>(field_fourier_fftw), dims_real));
 
   std::vector<ptrdiff_t> dims_fourier_(extra_dims.begin(), extra_dims.end());
   dims_fourier_.insert(dims_fourier_.end(), {cells0_reduced, cells[2], *cells1_fftw});
-  Eigen::array<ptrdiff_t, Rank> dims_fourier;
   std::copy_n(dims_fourier_.begin(), Rank, dims_fourier.begin());
   field_fourier.reset(new Eigen::TensorMap<Eigen::Tensor<std::complex<double>, Rank>>(reinterpret_cast<std::complex<double>*>(field_fourier_fftw), dims_fourier));
 
@@ -105,16 +103,6 @@ Eigen::Tensor<complex<double>, Rank> FFT<Rank>::get_field_fourier() {
   return field_fourier_;
 }
 
-template <int Rank>
-void FFT<Rank>::forward() {
-  fftw_mpi_execute_dft_r2c(plan_forth, field_real->data(), field_fourier_fftw);
-}
-
-template <int Rank>
-void FFT<Rank>::backward(double &wgt) {
-  fftw_mpi_execute_dft_c2r(plan_back, field_fourier_fftw, field_real->data());
-  *field_real = *field_real * wgt;
-}
 
 template class FFT<3>;
 template class FFT<4>;
@@ -144,31 +132,21 @@ void Spectral::init(){
   int fftw_planner_flag = FFTW_MEASURE;
   //  call fftw_set_timelimit(num_grid%get_asFloat('fftw_timelimit',defaultVal=300.0_pReal)) 229
   fftw_set_timelimit(300.0);
-  std::cout << "\n FFTW initialized" << std::endl;
 
-  std::array<ptrdiff_t, 3> cells_fftw = {grid.cells[0], grid.cells[1], grid.cells[2]};
+  std::cout << "\n FFTW initialized" << std::endl;
 
   ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
 
-  // call tensor func
-  // set_up_fftw(cells1_fftw, cells1_offset, 
-  //             cells2_fftw,
-  //             tensor_size, 
-  //             tensorField_real, tensorField_fourier, tensorField_fourier_fftw,
-  //             fftw_planner_flag, plan_tensor_forth, plan_tensor_back,
-  //             "tensor");
-  // grid.cells1_tensor = cells1_fftw;
-  // grid.cells1_offset_tensor = cells1_offset;
+  std::vector<int> tensorfield_extra_dims = {3, 3};
+  tensorfield.reset(new FFT<5>(grid.cells, grid.cells2, tensorfield_extra_dims, fftw_planner_flag, &cells1_fftw, &cells1_offset, &cells2_fftw));
+  grid.cells1_tensor = cells1_fftw;
+  grid.cells1_offset_tensor = cells1_offset;
 
-  // set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, vector_size, 
-  //             vectorField_real, vectorField_fourier, vectorField_fourier_fftw,
-  //             fftw_planner_flag, plan_vector_forth, plan_vector_back,
-  //             "vector");
+  std::vector<int> vectorfield_extra_dims = {3};
+  vectorfield.reset(new FFT<4>(grid.cells, grid.cells2, vectorfield_extra_dims, fftw_planner_flag, &cells1_fftw, &cells1_offset, &cells2_fftw));
 
-  // set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, scalar_size, 
-  //             scalarField_real, scalarField_fourier, scalarField_fourier_fftw,
-  //             fftw_planner_flag, plan_scalar_forth, plan_scalar_back,
-  //             "scalar");
+  std::vector<int> scalarfield_extra_dims = {};
+  scalarfield.reset(new FFT<3>(grid.cells, grid.cells2, scalarfield_extra_dims, fftw_planner_flag, &cells1_fftw, &cells1_offset, &cells2_fftw));
 
   xi1st.resize(3, grid.cells0_reduced, grid.cells[2], grid.cells1_tensor);
     xi1st.setConstant(std::complex<double>(0,0));
