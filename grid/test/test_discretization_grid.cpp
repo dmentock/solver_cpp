@@ -4,10 +4,10 @@
 #include <mpi.h>
 #include <fftw3-mpi.h>
 
-#include "discretization_grid.h"
+#include <discretization_grid.h>
 
-#include "tensor_operations.h"
-#include "helper.h"
+#include <tensor_operations.h>
+#include <helper.h>
 
 class PartialMockDiscretizationGrid : public DiscretizationGrid {
   public:

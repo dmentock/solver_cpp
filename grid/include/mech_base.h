@@ -1,9 +1,9 @@
-#ifndef UTILITIES_H
-#define UTILITIES_H
+#ifndef MECH_BASE_H
+#define MECH_BASE_H
 
 #include <config.h>
 #include <discretization_grid.h>
-#include <spectral/spectral.h>
+#include <spectral.h>
 
 #include <unsupported/Eigen/CXX11/Tensor>
 
@@ -14,9 +14,13 @@ using Eigen::MatrixXd;
 using namespace std;
 using namespace Eigen;
 
-class MechUtilities {
+//!  Base class for the mechanical spectral grid solver. 
+/*!
+  Implements all functionalities required by the basic and polarization solving scheme.
+*/
+class MechBase {
 public:
-  MechUtilities(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
+  MechBase(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
       : config(config_), grid(grid_), spectral(spectral_) {}
 
   void init_utilities();
@@ -48,4 +52,4 @@ protected:
   DiscretizationGrid& grid;
   Config& config;
 };
-#endif // UTILITIES_H
+#endif // MECH_BASE_H

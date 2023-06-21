@@ -1,8 +1,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include "spectral/spectral.h"
-#include "spectral/mech/utilities.h"
+#include <spectral.h>
+#include <mech_base.h>
 
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <Eigen/Core>
@@ -10,15 +10,15 @@
 #include "simple_grid_setup.hpp"
 #include "init_environments.hpp"
 
-#include "test/complex_concatenator.h"
-#include "tensor_operations.h"
-#include "helper.h"
+#include <test/complex_concatenator.h>
+#include <tensor_operations.h>
+#include <helper.h>
 
-TEST_F(GridTestSetup, MechUtilitiesTestInit) {
+TEST_F(GridTestSetup, MechBaseTestInit) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
 
-  MechUtilities mech_utilities(config, *mock_grid, spectral);
+  MechBase mech_utilities(config, *mock_grid, spectral);
 
   config.num_grid.memory_efficient = 0;
   Eigen::DSizes<Eigen::DenseIndex, 7> expected_gamma_hat_dims(3, 3, 3, 3, 2, 1, 1);
@@ -33,12 +33,12 @@ TEST_F(GridTestSetup, MechUtilitiesTestInit) {
   // TODO: mock calls to set_up_fftw template function
 }
 
-TEST_F(GridTestSetup,MechUtilitiesTestInitDivergenceCorrection) {
+TEST_F(GridTestSetup,MechBaseTestInitDivergenceCorrection) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   mock_grid->geom_size = std::array<double, 3>{3,4,5};
 
-  MechUtilities mech_utilities(config, *mock_grid, spectral);
+  MechBase mech_utilities(config, *mock_grid, spectral);
 
   config.num_grid.divergence_correction = 0;
   mech_utilities.init_utilities();
@@ -55,14 +55,14 @@ TEST_F(GridTestSetup,MechUtilitiesTestInitDivergenceCorrection) {
   ASSERT_EQ(mock_grid->scaled_geom_size, expected_scaled_geom_size_2);
 }
 
-TEST_F(GridTestSetup, MechUtilitiesTestUpdateCoords) {
+TEST_F(GridTestSetup, MechBaseTestUpdateCoords) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
   spectral.tensorfield.reset(gridTestSetup_init_fft<5>(*mock_grid));
   spectral.vectorfield.reset(gridTestSetup_init_fft<4>(*mock_grid));
 
-  MechUtilities mech_utilities(config, *mock_grid, spectral);
+  MechBase mech_utilities(config, *mock_grid, spectral);
 
   spectral.xi2nd.resize(3, 2, 1, 1);
   spectral.xi2nd.setValues({
@@ -107,7 +107,7 @@ TEST_F(GridTestSetup, TestUpdateGamma) {
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
-  MechUtilities mech_utilities(config, *mock_grid, spectral);
+  MechBase mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 4> C_min_max_avg(3,3,3,3);
   C_min_max_avg.setValues({
@@ -147,12 +147,12 @@ TEST_F(GridTestSetup, TestUpdateGamma) {
   // TODO: find testcases that cause gamma fluctuation
 }
 
-TEST_F(GridTestSetup, MechUtilitiesTestForwardField) {
+TEST_F(GridTestSetup, MechBaseTestForwardField) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
-  MechUtilities mech_utilities(config, *mock_grid, spectral);
+  MechBase mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 5> field_last_inc(3, 3, 2, 1, 1);
   field_last_inc.setValues({
@@ -189,12 +189,12 @@ TEST_F(GridTestSetup, MechUtilitiesTestForwardField) {
   EXPECT_TRUE(tensor_eq(forwarded_field, expected_forwarded_field));
 }
 
-TEST_F(GridTestSetup, MechUtilitiesTestMaskedCompliance) {
+TEST_F(GridTestSetup, MechBaseTestMaskedCompliance) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.wgt = 0.5;
 
-  MechUtilities mech_utilities(config, *mock_grid, spectral);
+  MechBase mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Quaterniond rot_bc_q(1.0, 0.0, 0.0, 0.0);
 
@@ -275,13 +275,13 @@ TEST_F(GridTestSetup, MechUtilitiesTestMaskedCompliance) {
   // TODO: Find more understandable test setup
 }
 
-TEST_F(GridTestSetup, MechUtilitiesTestDivergenceRMS) {
+TEST_F(GridTestSetup, MechBaseTestDivergenceRMS) {
   gridSetup_init_grid(std::array<int, 3>{4,1,1}); // use larger grid to enter if branch
   Spectral spectral(config, *mock_grid);
   spectral.tensorfield.reset(gridTestSetup_init_fft<5>(*mock_grid));
   spectral.wgt = 0.25;
 
-  MechUtilities mech_utilities(config, *mock_grid, spectral);
+  MechBase mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 5> tensor_field(3, 3, 4, 1, 1);
   tensor_field.setValues({
@@ -340,12 +340,12 @@ TEST_F(GridTestSetup, MechUtilitiesTestDivergenceRMS) {
   // TODO: Add test for diverging
 }
 
-TEST_F(GridTestSetup, MechUtilitiesTestGammaConvolution) {
+TEST_F(GridTestSetup, MechBaseTestGammaConvolution) {
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   Spectral spectral(config, *mock_grid);
   spectral.tensorfield.reset(gridTestSetup_init_fft<5>(*mock_grid));
 
-  MechUtilities mech_utilities(config, *mock_grid, spectral);
+  MechBase mech_utilities(config, *mock_grid, spectral);
 
   Eigen::Tensor<double, 5> field(3, 3, 2, 1, 1);
   field.setValues({

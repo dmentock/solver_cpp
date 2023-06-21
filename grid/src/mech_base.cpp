@@ -1,4 +1,4 @@
-#include "spectral/mech/utilities.h"
+#include <mech_base.h>
 
 #include <fortran_utilities.h>
 #include <tensor_operations.h>
@@ -8,7 +8,7 @@
 #include <string>
 #include <limits>
 
-void MechUtilities::init_utilities(){
+void MechBase::init_utilities(){
   std::cout << "\n <<<+-  spectral mech init  -+>>>" << std::endl;
 
   if (config.num_grid.divergence_correction == 1) {
@@ -44,7 +44,7 @@ void MechUtilities::init_utilities(){
   }
 }
 
-void MechUtilities::update_coords(Tensor<double, 5> &F, Tensor<double, 2>& x_n_, Tensor<double, 2>& x_p_) {
+void MechBase::update_coords(Tensor<double, 5> &F, Tensor<double, 2>& x_n_, Tensor<double, 2>& x_p_) {
   Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&F);
 
   // Average F
@@ -159,7 +159,7 @@ void MechUtilities::update_coords(Tensor<double, 5> &F, Tensor<double, 2>& x_n_,
   }
 }
 
-void MechUtilities::update_gamma(Tensor<double, 4> &C) {
+void MechBase::update_gamma(Tensor<double, 4> &C) {
   C_ref = C / spectral.wgt;
   if (!config.num_grid.memory_efficient){
     gamma_hat.setConstant(complex<double>(0.0, 0.0));
@@ -191,23 +191,23 @@ void MechUtilities::update_gamma(Tensor<double, 4> &C) {
             A.block<3, 3>(3, 3) = temp33_cmplx.real();
             A.block<3, 3>(0, 3) = temp33_cmplx.imag(); 
             A.block<3, 3>(3, 0) = -temp33_cmplx.imag();
-            if (std::abs(A.block<3, 3>(0, 0).determinant()) > 1e-16) {
-              Eigen::Matrix<double, 6, 6> A_inv;
-              A_inv = A.inverse();
-              for (int i = 0; i < 3; ++i) {
-                for (int j = 0; j < 3; ++j) {
-                  temp33_cmplx(i, j) = std::complex<double>(A_inv(i, j), A_inv(i + 3, j));
-                }
-              }
-              for (int m = 0; m < 3; ++m) {
-                for (int n = 0; n < 3; ++n) {
-                    for (int o = 0; o < 3; ++o) {
-                for (int l = 0; l < 3; ++l) 
-                  gamma_hat(l, m, n, o, i, k, j - grid.cells1_offset_tensor) = temp33_cmplx(l, n) * xiDyad_cmplx(o, m);
-                  }
-                }
-              }
-            }
+            // if (std::abs(A.block<3, 3>(0, 0).determinant()) > 1e-16) {
+            //   Eigen::Matrix<double, 6, 6> A_inv;
+            //   A_inv = A.inverse();
+            //   for (int i = 0; i < 3; ++i) {
+            //     for (int j = 0; j < 3; ++j) {
+            //       temp33_cmplx(i, j) = std::complex<double>(A_inv(i, j), A_inv(i + 3, j));
+            //     }
+            //   }
+            //   for (int m = 0; m < 3; ++m) {
+            //     for (int n = 0; n < 3; ++n) {
+            //         for (int o = 0; o < 3; ++o) {
+            //     for (int l = 0; l < 3; ++l) 
+            //       gamma_hat(l, m, n, o, i, k, j - grid.cells1_offset_tensor) = temp33_cmplx(l, n) * xiDyad_cmplx(o, m);
+            //       }
+            //     }
+            //   }
+            // }
           }
         }
       }
@@ -215,7 +215,7 @@ void MechUtilities::update_gamma(Tensor<double, 4> &C) {
   }
 }
 
-void MechUtilities::forward_field(double delta_t, 
+void MechBase::forward_field(double delta_t, 
                             Tensor<double, 5> &field_last_inc, 
                             Tensor<double, 5> &rate, 
                             Tensor<double, 5> &forwarded_field,
@@ -253,7 +253,7 @@ void MechUtilities::forward_field(double delta_t,
   }
 }
 
-void MechUtilities::calculate_masked_compliance( Tensor<double, 4> &C,
+void MechBase::calculate_masked_compliance( Tensor<double, 4> &C,
                                             Eigen::Quaterniond &rot_bc_q,
                                             const Eigen::Matrix<bool, 3, 3> &mask_stress,
                                             Tensor<double, 4> &masked_compliance) {
@@ -306,7 +306,7 @@ void MechUtilities::calculate_masked_compliance( Tensor<double, 4> &C,
   f_math_99to3333(temp99_real.data(), masked_compliance.data());
 }
 
-double MechUtilities::calculate_divergence_rms(const Tensor<double, 5>& tensor_field) {
+double MechBase::calculate_divergence_rms(const Tensor<double, 5>& tensor_field) {
   Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&tensor_field);
 
   Eigen::Vector3cd rescaled_geom;
@@ -350,7 +350,7 @@ double MechUtilities::calculate_divergence_rms(const Tensor<double, 5>& tensor_f
   return rms;
 }
 
-Tensor<double, 5> MechUtilities::gamma_convolution(Tensor<double, 5> &field, Tensor<double, 2> &field_aim){
+Tensor<double, 5> MechBase::gamma_convolution(Tensor<double, 5> &field, Tensor<double, 2> &field_aim){
 
   Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&field);
   Eigen::Matrix<complex<double>, 3, 3> temp33_cmplx;

@@ -1,6 +1,7 @@
 #ifndef SPECTRAL_H
 #define SPECTRAL_H
 
+#include <fft.h>
 #include <discretization_grid.h>
 #include <config.h>
 
@@ -22,74 +23,6 @@ extern "C" {
   void f_homogenization_thermal_response(double* Delta_t, int* cell_start, int* cell_end);
   void f_homogenization_mechanical_response2(double* Delta_t, int* FEsolving_execIP, int* FEsolving_execElem);
 }
-
-template <int Rank>
-class FFT {
-public:
-  FFT(std::array<int, 3>& cells,
-      int cells2,
-      std::vector<int>& extra_dims,
-      int fftw_planner_flag,
-      ptrdiff_t* cells1_fftw = nullptr,
-      ptrdiff_t* cells1_offset = nullptr,
-      ptrdiff_t* cells2_fftw = nullptr) {
-    init_fft(cells, cells2, extra_dims, fftw_planner_flag, cells1_fftw, cells1_offset, cells2_fftw);
-  }
-    void set_field_real(Eigen::Tensor<double, Rank> &field_real_);
-    void set_field_fourier(Eigen::Tensor<complex<double>, Rank> &field_fourier_);
-    Eigen::Tensor<double, Rank> get_field_real();
-    Eigen::Tensor<complex<double>, Rank> get_field_fourier();
-
-
-  template <typename TensorType>
-  Eigen::Tensor<std::complex<double>, Rank> forward(TensorType* field_real_) {
-    if (field_real_->data() != field_real->data()) {
-      field_real->slice(indices_nullify_start, indices_nullify_extents).setZero();
-      field_real->slice(indices_values_start, indices_values_extents_real) = *field_real_;
-    }
-    fftw_mpi_execute_dft_r2c(plan_forth, field_real->data(), field_fourier_fftw);
-    Eigen::TensorMap<Eigen::Tensor<complex<double>, Rank>> field_fourier_map = *field_fourier;
-    Eigen::Tensor<complex<double>, Rank> field_fourier_ = field_fourier_map;
-    return field_fourier_.slice(indices_values_start, indices_values_extents_fourier);
-  }
-
-  template <typename TensorType>
-  Eigen::Tensor<double, Rank> backward(TensorType* field_fourier_, double &wgt) {
-    if (field_fourier_->data() != field_fourier->data()) {
-      field_fourier->slice(indices_values_start, indices_values_extents_fourier) = *field_fourier_;
-    }
-    fftw_mpi_execute_dft_c2r(plan_back, field_fourier_fftw, field_real->data());
-    Eigen::TensorMap<Eigen::Tensor<double, Rank>> field_real_map = *field_real;
-    Eigen::Tensor<double, Rank> field_real_ = field_real_map * wgt;
-    return field_real_.slice(indices_values_start, indices_values_extents_real);
-  }
-
-
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, Rank>>> field_real;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<complex<double>, Rank>>> field_fourier;
-
-protected:
-    void init_fft(std::array<int, 3>& cells,
-                int cells2,
-                std::vector<int>& extra_dims,
-                int fftw_planner_flag,
-                ptrdiff_t* cells1_fftw = nullptr,
-                ptrdiff_t* cells1_offset = nullptr,
-                ptrdiff_t* cells2_fftw = nullptr);
-
-  fftw_complex* field_fourier_fftw;
-  fftw_plan plan_forth;
-  fftw_plan plan_back;
-
-  Eigen::array<ptrdiff_t, Rank> dims_real;
-  Eigen::array<ptrdiff_t, Rank> dims_fourier;
-
-  Eigen::array<Eigen::Index, Rank> indices_nullify_start;
-  Eigen::array<Eigen::Index, Rank> indices_nullify_extents;
-  Eigen::array<Eigen::Index, Rank> indices_values_start;
-  Eigen::array<Eigen::Index, Rank> indices_values_extents_real;
-  Eigen::array<Eigen::Index, Rank> indices_values_extents_fourier;
-};
 
 class Spectral {
 public:
@@ -139,17 +72,34 @@ public:
   Eigen::Tensor<std::complex<double>, 4> xi1st;
   Eigen::Tensor<std::complex<double>, 4> xi2nd;
 
-  std::unique_ptr<FFT<3>> scalarfield;
-  std::unique_ptr<FFT<4>> vectorfield;
-  std::unique_ptr<FFT<5>> tensorfield;
+  unique_ptr<FFT<3>> scalarfield;
+  unique_ptr<FFT<4>> vectorfield;
+  unique_ptr<FFT<5>> tensorfield;
+
+  struct BoundaryCondition {
+    Eigen::Matrix<double, 3, 3> values_double = Eigen::Matrix<double, 3, 3>::Zero();
+    Eigen::Matrix<bool, 3, 3> values_bool = Eigen::Matrix<bool, 3, 3>::Constant(true);
+    std::string type;
+
+    BoundaryCondition(const std::string& type_)
+    : type(type_) {}
+  };
+
 protected:
+
   DiscretizationGrid& grid;
   Config& config;
-  int tensor_size = 9;
-  int vector_size = 3;
-  int scalar_size = 1;
 
 private:
   const double TAU = 2 * M_PI;
 };
+
+struct SolutionParams {
+  Eigen::Matrix<double, 3, 3> stress_bc;
+  Eigen::Matrix<bool, 3, 3> stress_mask;
+  Eigen::Quaterniond rot_bc_q;
+  double delta_t;
+};
+
+
 #endif // SPECTRAL_H

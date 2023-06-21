@@ -20,30 +20,36 @@ target_link_libraries(test_discretization_grid
                       GTest::GTest 
                       GTest::Main 
                       gmock gmock_main)
+
+add_executable(test_fft test_fft.cpp)
+target_link_libraries(test_fft 
+                      fft
+                      GTest::GTest
+                      GTest::Main)                 
                       
 add_executable(test_spectral test_spectral.cpp)
 target_link_libraries(test_spectral 
                       spectral
                       discretization_grid
                       f_clean_up_fortran
-                      GTest::GTest 
+                      GTest::GTest
                       GTest::Main 
                       gmock gmock_main)
                       
-add_executable(test_spectral_mech_utilities test_spectral_mech_utilities.cpp)
-target_link_libraries(test_spectral_mech_utilities 
+add_executable(test_mech_base test_mech_base.cpp)
+target_link_libraries(test_mech_base 
                       ${PETSC_ARCH_DIR}/lib/libpetsc.so
-                      spectral_mech_utilities
+                      mech_base
                       spectral
                       discretization_grid
                       GTest::GTest 
                       GTest::Main 
                       gmock gmock_main)
 
-add_executable(test_spectral_mech_basic test_spectral_mech_basic.cpp)
-target_link_libraries(test_spectral_mech_basic 
+add_executable(test_mech_solver_basic test_mech_solver_basic.cpp)
+target_link_libraries(test_mech_solver_basic
                       PUBLIC
-                      spectral_mech_basic
+                      mech_solver_basic
                       ${PETSC_ARCH_DIR}/lib/libpetsc.so
                       GTest::GTest 
                       GTest::Main 

@@ -3,8 +3,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include <discretization_grid.h>
-#include "spectral/spectral.h"
-#include "spectral/mech/utilities.h"
+#include <spectral.h>
+#include <mech_base.h>
 #include <config.h>
 #include <petsc.h>
 #include <unsupported/Eigen/CXX11/Tensor>
