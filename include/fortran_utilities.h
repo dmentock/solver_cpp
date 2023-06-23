@@ -10,6 +10,7 @@ extern "C" {
   void f_rotate_tensor2(double* qu, double* T, double* rotated);
   void f_math_3333to99(double* m3333, double* m99);
   void f_math_99to3333(double* m99, double* m3333);
+  void f_math_mul3333xx33(double* A, double* B, double* res);
 }
 
 class FortranUtilities {
@@ -27,7 +28,9 @@ class FortranUtilities {
     }
   }
 
-  static Eigen::Tensor<double, 2> rotate_tensor2(Eigen::Quaterniond& rot_input, Eigen::Tensor<double, 2>& rotation) {
+  //verify that this works as expected
+  template <typename T>
+  static Eigen::Tensor<double, 2> rotate_tensor2(Eigen::Quaterniond& rot_input, T& rotation) {
     Eigen::Tensor<double, 2> rotated(3, 3);
     f_rotate_tensor2(rot_input.coeffs().data(), rotation.data(), rotated.data());
     return rotated;

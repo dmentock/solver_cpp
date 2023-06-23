@@ -350,7 +350,7 @@ double MechBase::calculate_divergence_rms(const Tensor<double, 5>& tensor_field)
   return rms;
 }
 
-Tensor<double, 5> MechBase::gamma_convolution(Tensor<double, 5> &field, Tensor<double, 2> &field_aim){
+Tensor<double, 5> MechBase::gamma_convolution(TensorMap<Tensor<double, 5>> &field, Tensor<double, 2> &field_aim) {
 
   Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&field);
   Eigen::Matrix<complex<double>, 3, 3> temp33_cmplx;

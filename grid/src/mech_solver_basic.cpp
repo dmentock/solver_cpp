@@ -13,6 +13,7 @@
 #include <spectral.h>
 #include <mech_solver_basic.h>
 #include <fortran_utilities.h>
+#include <tensor_operations.h>
 
 #include <helper.h>
 
@@ -110,21 +111,13 @@ PetscErrorCode MechSolverBasic::formResidual(DMDALocalInfo* residual_subdomain, 
   double* r_ = static_cast<double*>(r_raw);
   Eigen::TensorMap<Eigen::Tensor<double, 5>> F(F_, 3, 3, mech_basic->grid.cells[0], mech_basic->grid.cells[1], mech_basic->grid.cells[2]);
   Eigen::TensorMap<Eigen::Tensor<double, 5>> r(r_, 3, 3, mech_basic->grid.cells[0], mech_basic->grid.cells[1], mech_basic->grid.cells[2]);
-  
+
   int n_funcs, petsc_iter;
   SNESGetNumberFunctionEvals(mech_basic->SNES_mechanical, &n_funcs);
   SNESGetIterationNumber(mech_basic->SNES_mechanical, &petsc_iter);
 
   int total_iter = 0;
-  if (n_funcs == 0 && petsc_iter == 0) {
-      total_iter = -1; // new increment
-  }
-
-  if (total_iter <= petsc_iter) {
-      total_iter += 1;
-      // Print statements and other code from the original function
-      // ...
-  }
+  if (n_funcs == 0 && petsc_iter == 0) total_iter = -1; // new increment
 
   if (total_iter <= petsc_iter) {
   total_iter += 1;
@@ -138,17 +131,26 @@ PetscErrorCode MechSolverBasic::formResidual(DMDALocalInfo* residual_subdomain, 
   std::cout.flush();
   }
 
-  print_f_map("P", r);
   mech_basic->spectral.constitutive_response(r, mech_basic->P_av, mech_basic->C_volAvg, mech_basic->C_minMaxAvg, F, mech_basic->params.delta_t, mech_basic->params.rot_bc_q);
-  print_f_map("P", r);
-  // int err_MPI;
-  // MPI_Allreduce(MPI_IN_PLACE, &terminallyIll, 1, MPI_INTEGER, MPI_LOR, MPI_COMM_WORLD, &err_MPI);
-  // if (err_MPI != MPI_SUCCESS) {
-  //     std::cerr << "MPI error";
-  //     exit(-1);  // or handle the error as you prefer
-  // }
-  // double err_div = utilities_divergenceRMS(P);
-  
+  MPI_Allreduce(MPI_IN_PLACE, mech_basic->spectral.terminally_ill, 1, MPI_INTEGER, MPI_LOR, MPI_COMM_WORLD);
+  mech_basic->err_div = mech_basic->calculate_divergence_rms(r);
+
+  Eigen::Matrix<double, 3, 3> delta_F_aim;
+  f_math_mul3333xx33(mech_basic->S.data(), mech_basic->P_av.data(), delta_F_aim.data());
+  cout << "lel " << delta_F_aim << endl;
+  mech_basic->F_aim = mech_basic->F_aim - delta_F_aim;
+
+
+  // Eigen::Tensor<double, 2> diff = (P_av - P_aim).abs() * stress_mask.cast<double>();
+  // double err_BC = diff.maximum();
+
+  Eigen::Matrix<double, 3, 3> stress_mask_double = mech_basic->params.stress_mask.cast<double>();
+  Eigen::Tensor<double, 2> diff = (mech_basic->P_av - mech_basic->P_aim).abs() * 
+    mat_to_tensor(stress_mask_double);
+  // Eigen::Tensor<double, 0> err_BC_ = diff.maximum();
+  // mech_basic->err_BC = err_BC_(0);
+  // cout << "err_BC " << err_BC_ << endl;
+  // Eigen::Tensor<double, 5> r__ = gamma_convolution(r, )
   return 0;
 }
 

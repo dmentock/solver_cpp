@@ -64,6 +64,28 @@ auto tensor_sum(const TensorType& tensor) -> typename TensorType::Scalar {
   return sum;
 }
 
+template <typename Type>
+Eigen::Matrix<Type, Eigen::Dynamic, Eigen::Dynamic> tensor_to_mat(Eigen::Tensor<Type, 2>& tensor){
+  return Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic>>(tensor.data(), tensor.dimension(0), tensor.dimension(1));
+}
+
+template <typename MatType, typename Type>
+Eigen::Tensor<Type, 2> mat_to_tensor(const MatType& matrix){
+  return Eigen::TensorMap<Eigen::Tensor<Type, 2>>(matrix.data(), matrix.rows(), matrix.cols());
+}
+
+template <typename TensorType>
+bool any_of(const TensorType& tensor, std::function<bool(typename TensorType::Scalar)> predicate) {
+    using T = typename TensorType::Scalar;
+    for (int i = 0; i < tensor.size(); ++i) {
+        if (predicate(tensor.data()[i])) {
+            return true;
+        }
+    }
+    return false;
+}
+
+
 template <typename MatrixType>
 auto matrix_sum(const MatrixType& mat) -> typename MatrixType::Scalar {
   using T = typename MatrixType::Scalar;

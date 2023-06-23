@@ -16,26 +16,30 @@
 #include "simple_grid_setup.hpp"
 #include "init_environments.hpp"
 #include <tensor_operations.h>
+#include <helper.h>
 
 using Tensor2d = Eigen::Tensor<double, 2>;
 using Tensor4d = Eigen::Tensor<double, 4>;
 using Tensor5d = Eigen::Tensor<double, 5>;
 using TensorMap5d = Eigen::TensorMap<Eigen::Tensor<double, 5>>;
 using optional_q = std::optional<Eigen::Quaterniond>;
-class PartialMockMechSolverBasic : public MechSolverBasic {
-public:
-  PartialMockMechSolverBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
-      : MechSolverBasic(config_, grid_, spectral_) {};
-  MOCK_METHOD(void, update_coords, (Tensor5d&, Tensor2d&, Tensor2d&), (override));
-  MOCK_METHOD(void, update_gamma, (Tensor4d&), (override));
+
+class PartialMockSpectral : public Spectral {
+  public:
+  PartialMockSpectral(Config& config_, DiscretizationGrid& grid_)
+  : Spectral(config_, grid_) {}
+  MOCK_METHOD(void, constitutive_response, (TensorMap5d&, Tensor2d&, Tensor4d&, Tensor4d&, TensorMap5d&, double, optional_q), (override));
 };
-  class PartialMockSpectral : public Spectral {
-    public:
-    PartialMockSpectral(Config& config_, DiscretizationGrid& grid_)
-    : Spectral(config_, grid_) {}
-    MOCK_METHOD(void, constitutive_response, (TensorMap5d&, Tensor2d&, Tensor4d&, Tensor4d&, TensorMap5d&, double, optional_q), (override));
-  };
+
 TEST_F(GridTestSetup, TestMechSolverBasicInit) {
+  class PartialMockMechSolverBasic : public MechSolverBasic {
+  public:
+    PartialMockMechSolverBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
+        : MechSolverBasic(config_, grid_, spectral_) {};
+    MOCK_METHOD(void, update_coords, (Tensor5d&, Tensor2d&, Tensor2d&), (override));
+    MOCK_METHOD(void, update_gamma, (Tensor4d&), (override));
+  };
+
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   PartialMockSpectral spectral(config, *mock_grid);
   PartialMockMechSolverBasic mech_basic(config, *mock_grid, spectral);
@@ -70,8 +74,16 @@ TEST_F(GridTestSetup, TestMechSolverBasicInit) {
   EXPECT_TRUE(tensor_eq(mech_basic.homogenization_F0, expected_homogenization_F0));
 }
 
-ACTION_P(SetArg0, value) { arg0 = value; }
+ACTION_P(SetArg0, value) {
+  arg0 = value;
+}
 TEST_F(GridTestSetup, TestFormResidual) {
+  class PartialMockMechSolverBasic : public MechSolverBasic {
+  public:
+    PartialMockMechSolverBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
+        : MechSolverBasic(config_, grid_, spectral_) {};
+    MOCK_METHOD(double, calculate_divergence_rms, (const Tensor5d&), (override));
+  };
   gridSetup_init_grid(std::array<int, 3>{2,1,1});
   PartialMockSpectral spectral(config, *mock_grid);
   PartialMockMechSolverBasic mech_basic(config, *mock_grid, spectral);
@@ -92,6 +104,42 @@ TEST_F(GridTestSetup, TestFormResidual) {
   });
   Eigen::Tensor<double, 5> r(3, 3, 2, 1, 1);
   r.setZero();
+
+  mech_basic.S.setValues({
+   {{{  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      }},
+    {{  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      }},
+    {{  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      }}},
+   {{{  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      }},
+    {{  0                     ,  0                     ,  0                      },
+     {  0                     ,  1.0088275068222855e-11,  0                      },
+     {  0                     ,  0                     , -6.176010751524149e-12  }},
+    {{  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      }}},
+   {{{  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      }},
+    {{  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      },
+     {  0                     ,  0                     ,  0                      }},
+    {{  0                     ,  0                     ,  0                      },
+     {  0                     , -6.1760107515241474e-12,  0                      },
+     {  0                     ,  0                     ,  1.0143787719914657e-11 }}}
+  });
+
+  mech_basic.P_av.setValues({
+   {  11823136502.860432,  7002921.528785944 , -2955965.2798513174 },
+   {  6365135.0016226768,  11717501649.529392,  2763467.0539796352 },
+   { -2686752.6630164981,  2763467.0539802313,  11713929615.397129 }
+  });
 
   Eigen::Tensor<double, 5> mocked_constitutive_response_P(3, 3, 2, 1, 1);
   mocked_constitutive_response_P.setValues({
@@ -114,17 +162,28 @@ TEST_F(GridTestSetup, TestFormResidual) {
     {{{  11722169413.974548 }},
      {{  11705689816.819708 }}}}
   });
+
+  mech_basic.F_aim << 1.1002000000000001, 0, 0,
+                      0                 , 1, 0,
+                      0                 , 0, 1;
+
+  Eigen::TensorMap<Eigen::Tensor<double, 5>> mocked_constitutive_response_P_map(
+    mocked_constitutive_response_P.data(), 3, 3, 2, 1, 1);
   EXPECT_CALL(spectral, constitutive_response
     (testing::_, testing::_, testing::_, testing::_, testing::_, testing::_, testing::_))
-    .WillOnce(SetArg0(mocked_constitutive_response_P));
+    .WillOnce(SetArg0(mocked_constitutive_response_P_map));
 
+  EXPECT_CALL(mech_basic, calculate_divergence_rms(testing::_)).WillOnce(testing::Return(0));
+  
   void* mech_basic_raw = static_cast<void*>(&mech_basic);
 
-  mech_basic.params.rot_bc_q = Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0);
-
+  mech_basic.params.stress_mask <<  true, true, true,
+                                    true, false, true,
+                                    true, true, false;
   SNESCreate(PETSC_COMM_WORLD, &(mech_basic.SNES_mechanical));
-  
-  mech_basic.formResidual(&residual_subdomain, &F, &r, mech_basic_raw);
+  print_f("Paa", r);
+  mech_basic.formResidual(&residual_subdomain, F.data(), r.data(), mech_basic_raw);
+  print_f("Paa", r);
 }
 
 int main(int argc, char **argv) {

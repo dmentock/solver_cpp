@@ -359,6 +359,7 @@ TEST_F(GridTestSetup, MechBaseTestGammaConvolution) {
     {{{ -255142.0290418919  }}, {{  281033.698685078   }}},
     {{{  15980056.25126295  }}, {{  15457099.20758347  }}}}
   });
+  TensorMap<Tensor<double, 5>> field_map(field.data(), 3, 3, 2, 1, 1);
 
   Eigen::Tensor<double, 2> field_aim(3, 3);
   field_aim.setValues({
@@ -434,13 +435,13 @@ TEST_F(GridTestSetup, MechBaseTestGammaConvolution) {
   mech_utilities.gamma_hat.setZero();
 
   config.num_grid.memory_efficient = 0;
-  Eigen::Tensor<double, 5> gamma_field0 = mech_utilities.gamma_convolution(field, field_aim);
+  Eigen::Tensor<double, 5> gamma_field0 = mech_utilities.gamma_convolution(field_map, field_aim);
   EXPECT_TRUE(tensor_eq(gamma_field0, expected_gamma_field));
 
   config.num_grid.memory_efficient = 1;
-  Eigen::Tensor<double, 5> gamma_field1 = mech_utilities.gamma_convolution(field, field_aim);
+  Eigen::Tensor<double, 5> gamma_field1 = mech_utilities.gamma_convolution(field_map, field_aim);
   EXPECT_TRUE(tensor_eq(gamma_field1, expected_gamma_field));
-  // TODO: add test where det of A is large enough to enter if branch for memory_efficient=1
+  // TODO: for memory_efficient=1, add test where det of A is large enough to enter if branch 
 }
 
 int main(int argc, char **argv) {
