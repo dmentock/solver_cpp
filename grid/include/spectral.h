@@ -77,13 +77,10 @@ public:
   unique_ptr<FFT<5>> tensorfield;
 
   struct BoundaryCondition {
-    Eigen::Matrix<double, 3, 3> values_double = Eigen::Matrix<double, 3, 3>::Zero();
-    Eigen::Matrix<bool, 3, 3> values_bool = Eigen::Matrix<bool, 3, 3>::Constant(true);
+    Eigen::Matrix<double, 3, 3> values = Eigen::Matrix<double, 3, 3>::Zero();
+    Eigen::Matrix<bool, 3, 3> mask = Eigen::Matrix<bool, 3, 3>::Constant(true);
     std::string type;
-
-    BoundaryCondition(const std::string& type_)
-    : type(type_) {}
-  };
+      };
 
 protected:
 

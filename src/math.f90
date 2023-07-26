@@ -117,5 +117,35 @@ real(pReal) pure function math_det33(m)
 
 end function math_det33
 
+subroutine math_mul3333xx33_(A, B, res) bind(C, name="f_math_mul3333xx33")
+
+  real(pReal), dimension(3,3,3,3), intent(in) :: A
+  real(pReal), dimension(3,3),     intent(in) :: B
+  real(pReal), dimension(3,3) :: res
+
+  res = math_mul3333xx33(A, B)
+end subroutine math_mul3333xx33_
+
+!--------------------------------------------------------------------------------------------------
+!> @brief matrix double contraction 3333x33 = 33 (ijkl,kl)
+!--------------------------------------------------------------------------------------------------
+pure function math_mul3333xx33(A,B)
+
+  real(pReal), dimension(3,3,3,3), intent(in) :: A
+  real(pReal), dimension(3,3),     intent(in) :: B
+  real(pReal), dimension(3,3) :: math_mul3333xx33
+
+  integer :: i,j
+
+#ifndef __INTEL_COMPILER
+  do concurrent(i=1:3, j=1:3)
+    math_mul3333xx33(i,j) = sum(A(i,j,1:3,1:3)*B(1:3,1:3))
+  end do
+#else
+  forall (i=1:3, j=1:3) math_mul3333xx33(i,j) = sum(A(i,j,1:3,1:3)*B(1:3,1:3))
+#endif
+
+end function math_mul3333xx33
+
 
 end module math
