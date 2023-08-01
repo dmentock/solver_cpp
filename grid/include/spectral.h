@@ -16,8 +16,7 @@ using namespace std;
 using namespace Eigen;
 
 extern "C" {
-  void f_homogenization_fetch_tensor_pointers(int* n_cells_global,
-                                              double** homogenization_F0, double** homogenization_F,
+  void f_homogenization_fetch_tensor_pointers(double** homogenization_F0, double** homogenization_F,
                                               double** homogenization_P, double** homogenization_dPdF,
                                               void** terminally_ill);
   void f_homogenization_mechanical_response(double* Delta_t, int* cell_start, int* cell_end);
@@ -46,8 +45,7 @@ public:
     double* homogenization_P_raw_ptr;
     double* homogenization_dPdF_raw_ptr;
     void* raw_terminally_ill_raw_ptr;
-    f_homogenization_fetch_tensor_pointers (&n_cells_global, 
-                                            &homogenization_F0_raw_ptr, &homogenization_F_raw_ptr, 
+    f_homogenization_fetch_tensor_pointers (&homogenization_F0_raw_ptr, &homogenization_F_raw_ptr, 
                                             &homogenization_P_raw_ptr, &homogenization_dPdF_raw_ptr,
                                             &raw_terminally_ill_raw_ptr);
     homogenization_F0 = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F0_raw_ptr, 3, 3, n_cells_global);
