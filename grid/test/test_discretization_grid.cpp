@@ -8,6 +8,7 @@
 
 #include <tensor_operations.h>
 #include <helper.h>
+#include "init_environments.hpp"
 
 class PartialMockDiscretizationGrid : public DiscretizationGrid {
   public:
@@ -27,18 +28,8 @@ class PartialMockDiscretizationGrid : public DiscretizationGrid {
     // MOCK_METHOD(void, discretization_init, (array3i&, array3d&, int), (override));
 };
 
-class DiscretizationGridSetup : public ::testing::Test {
-  void SetUp() override {
-    MPI_Init(NULL, NULL);
-  }
-  void TearDown() override {
-    fftw_mpi_cleanup();
-    MPI_Finalize();
-  }
-};
-
 ACTION_P(SetArg0, value) { arg0 = value; }
-TEST_F(DiscretizationGridSetup, TestInit) {
+TEST(DiscretizationGridSetup, TestInit) {
 
   PartialMockDiscretizationGrid discretization_grid(std::array<int, 3>{2, 1, 1});
 
@@ -90,14 +81,10 @@ TEST_F(DiscretizationGridSetup, TestInit) {
   discretization_grid.init(false);
 }
 
-class CoordCalculationSetup : public ::testing::Test {
-  protected:
-    std::array<int, 3> cells = {2,1,1};
-    std::array<double, 3> geom_size = {2e-5,1e-5,1e-5};
-};
-
-TEST_F(CoordCalculationSetup, TestCalculateIpCoords0) {
-  DiscretizationGrid discretization_grid(std::array<int, 3>{2, 1, 1});
+TEST(CoordCalculationSetup, TestCalculateIpCoords0) {
+  std::array<int, 3> cells{2, 1, 1};
+  std::array<double, 3> geom_size = {2e-5,1e-5,1e-5};
+  DiscretizationGrid discretization_grid(cells);
 
   Eigen::Tensor<double, 2> expected_IPcoordinates0(3, 2);
   expected_IPcoordinates0.setValues({
@@ -111,7 +98,9 @@ TEST_F(CoordCalculationSetup, TestCalculateIpCoords0) {
   EXPECT_TRUE(tensor_eq(IPcoordinates0, expected_IPcoordinates0));
 }
 
-TEST_F(CoordCalculationSetup, TestCalculateNodes0) {
+TEST(CoordCalculationSetup, TestCalculateNodes0) {
+  std::array<int, 3> cells{2, 1, 1};
+  std::array<double, 3> geom_size = {2e-5,1e-5,1e-5};
   DiscretizationGrid discretization_grid(std::array<int, 3>{2, 1, 1});
 
   Eigen::Tensor<double, 2> expected_nodes0(3, 12);
@@ -132,6 +121,7 @@ TEST_F(CoordCalculationSetup, TestCalculateNodes0) {
 }
 
 int main(int argc, char **argv) {
+    ::testing::InitGoogleTest(&argc, argv);
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

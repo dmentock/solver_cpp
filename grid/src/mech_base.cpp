@@ -7,11 +7,14 @@
 #include <array>
 #include <string>
 #include <limits>
+#include <helper.h>
 
-void MechBase::init_utilities(){
+#include <mech_base.h>
+
+void MechBase::base_init(){
   std::cout << "\n <<<+-  spectral mech init  -+>>>" << std::endl;
 
-  if (config.num_grid.divergence_correction == 1) {
+  if (config.numerics.divergence_correction == 1) {
     double* min_geom_size = std::min_element(grid.geom_size.begin(), grid.geom_size.end());
     double* max_geom_size = std::max_element(grid.geom_size.begin(), grid.geom_size.end());
     for (int i = 0; i < 3; ++i) {
@@ -21,7 +24,7 @@ void MechBase::init_utilities(){
           grid.scaled_geom_size[j] = grid.geom_size[j] / grid.geom_size[i];
       }
     }
-  } else if (config.num_grid.divergence_correction == 2) {
+  } else if (config.numerics.divergence_correction == 2) {
     std::array<double, 3> normalized_geom_size = {grid.geom_size[0]/grid.cells[0], grid.geom_size[1]/grid.cells[1], grid.geom_size[2]/grid.cells[2]};
     double* min_normalized_geom_size = std::min_element(normalized_geom_size.begin(), normalized_geom_size.end());
     double* max_normalized_geom_size = std::max_element(normalized_geom_size.begin(), normalized_geom_size.end());
@@ -36,7 +39,7 @@ void MechBase::init_utilities(){
       grid.scaled_geom_size = grid.geom_size;
   }
 
-  if (config.num_grid.memory_efficient) {
+  if (config.numerics.memory_efficient) {
     gamma_hat.resize(3, 3, 3, 3, 1, 1, 1);
   } else {
     gamma_hat.resize(3,3,3,3,grid.cells0_reduced,grid.cells[2],grid.cells1_tensor);
@@ -44,9 +47,8 @@ void MechBase::init_utilities(){
   }
 }
 
-void MechBase::update_coords(Tensor<double, 5> &F, Tensor<double, 2>& x_n_, Tensor<double, 2>& x_p_) {
-  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&F);
-
+void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double, 2>& x_n_, Tensor<double, 2>& x_p_) {
+  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(F);
   // Average F
   Tensor<double, 2> Favg(3, 3);
   if (grid.cells1_offset_tensor == 0) {
@@ -161,7 +163,7 @@ void MechBase::update_coords(Tensor<double, 5> &F, Tensor<double, 2>& x_n_, Tens
 
 void MechBase::update_gamma(Tensor<double, 4> &C) {
   C_ref = C / spectral.wgt;
-  if (!config.num_grid.memory_efficient){
+  if (!config.numerics.memory_efficient){
     gamma_hat.setConstant(complex<double>(0.0, 0.0));
     for (int j = grid.cells1_offset_tensor; j < grid.cells1_offset_tensor + grid.cells1_tensor; ++j) {
       for (int k = 0; k < grid.cells[2]; ++k) {
@@ -215,14 +217,13 @@ void MechBase::update_gamma(Tensor<double, 4> &C) {
   }
 }
 
-void MechBase::forward_field(double delta_t, 
-                            Tensor<double, 5> &field_last_inc, 
-                            Tensor<double, 5> &rate, 
-                            Tensor<double, 5> &forwarded_field,
-                            Eigen::Matrix<double, 3, 3>* aim) {
+Tensor<double, 5> MechBase::forward_field(double delta_t, 
+                                          Tensor<double, 5> &field_last_inc, 
+                                          Tensor<double, 5> &rate,
+                                          Eigen::Matrix<double, 3, 3>* aim) {
 
 
-  forwarded_field = field_last_inc + rate*delta_t;
+  Tensor<double, 5> forwarded_field = field_last_inc + rate*delta_t;
   if (aim != nullptr){
     Eigen::array<int, 3> reduce_dims = {2, 3, 4};
     Eigen::Matrix<double, 3, 3> field_diff;
@@ -251,13 +252,13 @@ void MechBase::forward_field(double delta_t,
       }
     }
   }
+  return forwarded_field;
 }
 
-void MechBase::calculate_masked_compliance( Tensor<double, 4> &C,
+Tensor<double, 4> MechBase::calculate_masked_compliance( Tensor<double, 4> &C,
                                             Eigen::Quaterniond &rot_bc_q,
-                                            const Eigen::Matrix<bool, 3, 3> &mask_stress,
-                                            Tensor<double, 4> &masked_compliance) {
-
+                                            Eigen::Matrix<bool, 3, 3> &mask_stress) {
+  Tensor<double, 4> masked_compliance(3, 3, 3, 3);
   std::array<bool, 9> mask_stress_1d;
   for (int col = 0; col < mask_stress.cols(); ++col) {
     for (int row = 0; row < mask_stress.rows(); ++row) {
@@ -304,10 +305,11 @@ void MechBase::calculate_masked_compliance( Tensor<double, 4> &C,
     temp99_real.setZero();
   }
   f_math_99to3333(temp99_real.data(), masked_compliance.data());
+  return masked_compliance;
 }
 
 double MechBase::calculate_divergence_rms(const Tensor<double, 5>& tensor_field) {
-  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&tensor_field);
+  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(tensor_field);
 
   Eigen::Vector3cd rescaled_geom;
   for (int i = 0; i < 3; ++i) rescaled_geom[i] = complex<double>(grid.geom_size[i] / grid.scaled_geom_size[i], 0);
@@ -350,11 +352,11 @@ double MechBase::calculate_divergence_rms(const Tensor<double, 5>& tensor_field)
   return rms;
 }
 
-Tensor<double, 5> MechBase::gamma_convolution(Tensor<double, 5> &field, Tensor<double, 2> &field_aim){
+void MechBase::gamma_convolution(TensorMap<Tensor<double, 5>> &field, Tensor<double, 2> &field_aim) {
 
-  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(&field);
+  Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(field);
   Eigen::Matrix<complex<double>, 3, 3> temp33_cmplx;
-  if (config.num_grid.memory_efficient) {
+  if (config.numerics.memory_efficient) {
     Eigen::Matrix<double, 6, 6> A;
     Eigen::Matrix<double, 6, 6> A_inv;
     Eigen::Matrix<complex<double>, 3, 3> xiDyad_cmplx;
@@ -424,8 +426,26 @@ Tensor<double, 5> MechBase::gamma_convolution(Tensor<double, 5> &field, Tensor<d
     }
   }
   double neutral_wgt = 1;
-  return spectral.tensorfield->backward(spectral.tensorfield->field_fourier.get(), neutral_wgt);
+  field = spectral.tensorfield->backward(spectral.tensorfield->field_fourier.get(), neutral_wgt);
 }
 
-
+Eigen::Tensor<double, 5> MechBase::calculate_rate(bool heterogeneous, 
+                                                  const Eigen::Tensor<double, 5>& field0, 
+                                                  const Eigen::Tensor<double, 5>& field, 
+                                                  double dt, 
+                                                  const Eigen::Tensor<double, 2>& avRate) {
+  Eigen::Tensor<double, 5> rate(field.dimensions());
+  if (heterogeneous) {
+    rate = (field - field0) / dt;
+  } else {
+    for (int i = 0; i < field.dimension(2); ++i) {
+      for (int j = 0; j < field.dimension(3); ++j) {
+        for (int k = 0; k < field.dimension(4); ++k) {
+          rate.chip<4>(k).chip<3>(j).chip<2>(i) = avRate;
+        }
+      }
+    }
+  }
+  return rate;
+}
 

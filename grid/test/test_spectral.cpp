@@ -16,9 +16,10 @@
 
 TEST_F(GridTestSetup, SpectralTestInit) {
   
-  gridSetup_init_grid(std::array<int, 3>{2,1,1});
-  gridSetup_init_discretization();
-  Spectral spectral(config, *mock_grid);
+  MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
+
+  gridSetup_init_discretization(mock_grid);
+  Spectral spectral;
 
   Eigen::Tensor<std::complex<double>, 4> expected_xi1st(3, 2, 1, 1);
   expected_xi1st.setValues({
@@ -41,38 +42,38 @@ TEST_F(GridTestSetup, SpectralTestInit) {
     {{ c( 0               ,  0                ) }}}
   });
 
-  spectral.init();
+  spectral.init(0, mock_grid);
   EXPECT_TRUE(tensor_eq(spectral.xi1st, expected_xi1st));
   EXPECT_TRUE(tensor_eq(spectral.xi2nd, expected_xi2nd));
   // TODO: mock calls to set_up_fftw template function
 }
 
 TEST_F(GridTestSetup, SpectralTestHomogenizationFetchTensors) {
-  gridSetup_init_grid(std::array<int, 3>{2,1,1});
-  gridSetup_init_discretization();
+  MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
+
+  gridSetup_init_discretization(mock_grid);
   f_homogenization_init();
-  Spectral spectral(config, *mock_grid);
-  spectral.homogenization_fetch_tensor_pointers();
+  Spectral spectral;
+  spectral.homogenization_fetch_tensor_pointers(mock_grid.n_cells_global);
   f_deallocate_resources();
 }
 
 TEST_F(GridTestSetup, SpectralTestConstitutiveResponse) {
   class PartialMockSpectral : public Spectral {
     public:
-    PartialMockSpectral(Config& config_, DiscretizationGrid& grid_)
-    : Spectral(config_, grid_) {}
     using array2 = std::array<int, 2>;
     MOCK_METHOD(void, mechanical_response, (double Delta_t, int cell_start, int cell_end), (override));
     MOCK_METHOD(void, thermal_response, (double Delta_t, int cell_start, int cell_end), (override));
     MOCK_METHOD(void, mechanical_response2, (double Delta_t, array2& FEsolving_execIP, array2& FEsolving_execElem), (override));
   };
 
-  gridSetup_init_grid(std::array<int, 3>{2,1,1});
-  gridSetup_init_discretization();
+  MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
+
+  gridSetup_init_discretization(mock_grid);
   f_homogenization_init();
 
-  PartialMockSpectral spectral(config, *mock_grid);
-  spectral.homogenization_fetch_tensor_pointers();
+  PartialMockSpectral spectral;
+  spectral.homogenization_fetch_tensor_pointers(mock_grid.n_cells_global);
 
   spectral.wgt = 0.5;
   
@@ -172,7 +173,7 @@ TEST_F(GridTestSetup, SpectralTestConstitutiveResponse) {
     {{{  131                     }}, {{  1.9762625833649862e-323 }}},
     {{{  4.680306608333713e-310  }}, {{  4.9406564584124654e-324 }}}}
   });
-  Eigen::TensorMap<Eigen::Tensor<double, 5>> P_map(P.data(), 3, 3, mock_grid->cells[0], mock_grid->cells[1], mock_grid->cells[2]);
+  Eigen::TensorMap<Eigen::Tensor<double, 5>> P_map(P.data(), 3, 3, mock_grid.cells[0], mock_grid.cells[1], mock_grid.cells[2]);
 
   Eigen::Tensor<double, 2> P_av(3, 3);
   P_av.setZero();
@@ -189,7 +190,7 @@ TEST_F(GridTestSetup, SpectralTestConstitutiveResponse) {
    {{{{  0 }}, {{  0 }}}, {{{  1 }}, {{  1 }}}, {{{  0 }}, {{  0 }}}},
    {{{{  0 }}, {{  0 }}}, {{{  0 }}, {{  0 }}}, {{{  1 }}, {{  1 }}}}
   });
-  Eigen::TensorMap<Eigen::Tensor<double, 5>> F_map(F.data(), 3, 3, mock_grid->cells[0], mock_grid->cells[1], mock_grid->cells[2]);
+  Eigen::TensorMap<Eigen::Tensor<double, 5>> F_map(F.data(), 3, 3, mock_grid.cells[0], mock_grid.cells[1], mock_grid.cells[2]);
 
   double delta_t = 0;
 
@@ -256,20 +257,20 @@ TEST_F(GridTestSetup, SpectralTestConstitutiveResponse) {
 //   int cells_[] = {2, 1, 1};
 //   double geom_size_[] = {2e-5, 1e-5, 1e-5};
 //   MockDiscretizedGrid mock_grid(mock_discretization, &cells_[0], &geom_size_[0]);
-//   Spectral spectral(mock_grid);
+//   Spectral spectral;
 
 //   ptrdiff_t cells1_fftw, cells1_offset, cells2_fftw;
 //   spectral.set_up_fftw(cells1_fftw, cells1_offset, cells2_fftw, 9, 
 //                        spectral.tensorField_real, spectral.tensorField_fourier, spectral.tensorField_fourier_fftw,
 //                        FFTW_MEASURE, spectral.plan_tensor_forth, spectral.plan_tensor_back,
 //                        "tensor");
-//   mock_grid->cells1_tensor = cells1_fftw;
-//   mock_grid->cells1_offset_tensor = cells1_offset;
+//   mock_grid.cells1_tensor = cells1_fftw;
+//   mock_grid.cells1_offset_tensor = cells1_offset;
 
 //   fill_random(*spectral.tensorField_real);
 
-//   spectral.tensorField_real->slice(Eigen::array<long, 5>({0, 0, mock_grid->cells[0], 0, 0}), 
-//                                    Eigen::array<long, 5>({3, 3, mock_grid->cells0_reduced * 2 - mock_grid->cells[0], -1, -1})).setConstant(0);
+//   spectral.tensorField_real->slice(Eigen::array<long, 5>({0, 0, mock_grid.cells[0], 0, 0}), 
+//                                    Eigen::array<long, 5>({3, 3, mock_grid.cells0_reduced * 2 - mock_grid.cells[0], -1, -1})).setConstant(0);
 
 //   auto tensorField_real_copy = *(spectral.tensorField_real);
 

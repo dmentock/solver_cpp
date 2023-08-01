@@ -24,6 +24,7 @@ target_link_libraries(test_discretization_grid
 add_executable(test_fft test_fft.cpp)
 target_link_libraries(test_fft 
                       fft
+                      ${PETSC_ARCH_DIR}/lib/libpetsc.so
                       GTest::GTest
                       GTest::Main)                 
                       

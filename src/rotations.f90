@@ -43,22 +43,27 @@ module rotations
 
 contains
 
-subroutine rotate_tensor4(qu, T, rotated) bind(C, name="f_rotate_tensor4")
+subroutine rotate_tensor4(qu, T, rotated, active) bind(C, name="f_rotate_tensor4")
   real(c_double), intent(in), dimension(4) :: qu
-  real(c_double),     intent(in),  dimension(3,3,3,3) :: T
-  real(c_double),     intent(out), dimension(3,3,3,3) :: rotated
+  real(c_double), intent(in), dimension(3,3,3,3) :: T
+  real(c_double), intent(out), dimension(3,3,3,3) :: rotated
+  logical, intent(in) :: active
   type(tRotation) :: rot
   rot%q = qu
-  rotated = rot%rotTensor4(T)
+  rotated = rot%rotTensor4(T, active)
+
 end subroutine rotate_tensor4
 
-subroutine rotate_tensor2(qu, T, rotated) bind(C, name="f_rotate_tensor2")
+subroutine rotate_tensor2(qu, T, rotated, active) bind(C, name="f_rotate_tensor2")
   real(c_double), intent(in), dimension(4) :: qu
   real(c_double),     intent(in),  dimension(3,3) :: T
   real(c_double),     intent(out), dimension(3,3) :: rotated
+  logical, intent(in) :: active
   type(tRotation) :: rot
+
   rot%q = qu
-  rotated = rot%rotTensor2(T)
+  rotated = rot%rotTensor2(T, active)
+
 end subroutine rotate_tensor2
 
 pure function asMatrix(self)
@@ -184,7 +189,6 @@ pure function rotTensor2(self,T,active) result(tRot)
   class(tRotation), intent(in)                :: self
   real(pReal),     intent(in), dimension(3,3) :: T
   logical,         intent(in), optional       :: active
-
 
   tRot = merge(matmul(matmul(transpose(self%asMatrix()),T),self%asMatrix()), &
 

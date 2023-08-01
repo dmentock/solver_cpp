@@ -4,6 +4,8 @@
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <fftw3-mpi.h>
 #include <complex>
+#include <iostream>
+#include <type_traits>
 
 using namespace std;
 using namespace Eigen;
@@ -12,14 +14,21 @@ template <int Rank>
 class FFT {
 public:
   FFT(std::array<int, 3>& cells,
-      int cells2,
-      std::vector<int>& extra_dims,
-      int fftw_planner_flag,
-      ptrdiff_t* cells1_fftw = nullptr,
-      ptrdiff_t* cells1_offset = nullptr,
-      ptrdiff_t* cells2_fftw = nullptr) {
-    init_fft(cells, cells2, extra_dims, fftw_planner_flag, cells1_fftw, cells1_offset, cells2_fftw);
+    int cells2,
+    std::vector<int>& extra_dims,
+    int fftw_planner_flag,
+    ptrdiff_t* cells1_fftw = nullptr,
+    ptrdiff_t* cells1_offset = nullptr,
+    ptrdiff_t* cells2_fftw = nullptr) {
+    init(cells, cells2, extra_dims, fftw_planner_flag, cells1_fftw, cells1_offset, cells2_fftw);
   }
+  void init(std::array<int, 3>& cells,
+          int cells2,
+          std::vector<int>& extra_dims,
+          int fftw_planner_flag,
+          ptrdiff_t* cells1_fftw = nullptr,
+          ptrdiff_t* cells1_offset = nullptr,
+          ptrdiff_t* cells2_fftw = nullptr);
 
   void set_field_real(Tensor<double, Rank> &field_real_);
   void set_field_fourier(Tensor<std::complex<double>, Rank> &field_fourier_);
@@ -27,10 +36,10 @@ public:
   Tensor<std::complex<double>, Rank> get_field_fourier();
 
   template <typename TensorType>
-  Tensor<std::complex<double>, Rank> forward(TensorType* field_real_) {
-    if (field_real_->data() != field_real->data()) {
+  Tensor<std::complex<double>, Rank> forward(TensorType& field_real_) {
+    if (field_real_.data() != field_real->data()) {
       field_real->slice(indices_nullify_start, indices_nullify_extents).setZero();
-      field_real->slice(indices_values_start, indices_values_extents_real) = *field_real_;
+      field_real->slice(indices_values_start, indices_values_extents_real) = field_real_;
     }
     fftw_mpi_execute_dft_r2c(plan_forth, field_real->data(), field_fourier_fftw);
     TensorMap<Tensor<std::complex<double>, Rank>> field_fourier_map = *field_fourier;
@@ -49,18 +58,10 @@ public:
     return field_real_.slice(indices_values_start, indices_values_extents_real);
   }
 
-
   std::unique_ptr<TensorMap<Tensor<double, Rank>>> field_real;
   std::unique_ptr<TensorMap<Tensor<std::complex<double>, Rank>>> field_fourier;
 
 protected:
-    void init_fft(std::array<int, 3>& cells,
-                int cells2,
-                std::vector<int>& extra_dims,
-                int fftw_planner_flag,
-                ptrdiff_t* cells1_fftw = nullptr,
-                ptrdiff_t* cells1_offset = nullptr,
-                ptrdiff_t* cells2_fftw = nullptr);
 
   fftw_complex* field_fourier_fftw;
   fftw_plan plan_forth;
@@ -75,5 +76,4 @@ protected:
   Eigen::array<Index, Rank> indices_values_extents_real;
   Eigen::array<Index, Rank> indices_values_extents_fourier;
 };
-
 #endif // FFT_H

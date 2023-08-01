@@ -12,7 +12,7 @@
 #include <helper.h>
 #include <tensor_operations.h>
 
-void Spectral::init(){
+void Spectral::init(int spectral_derivative_id, DiscretizationGrid& grid){
   std::cout << "\n <<<+-  spectral init  -+>>>" << std::endl;
 
   std::cout << "\n M. Diehl, Diploma Thesis TU München, 2010" << std::endl;
@@ -33,7 +33,7 @@ void Spectral::init(){
   //get num vairables 177-210
   double scaled_geom_size[3] = {grid.geom_size[0], grid.geom_size[1], grid.geom_size[2]};
   int fftw_planner_flag = FFTW_MEASURE;
-  //  call fftw_set_timelimit(num_grid%get_asFloat('fftw_timelimit',defaultVal=300.0_pReal)) 229
+  //  call fftw_set_timelimit(numerics%get_asFloat('fftw_timelimit',defaultVal=300.0_pReal)) 229
   fftw_set_timelimit(300.0);
 
   std::cout << "\n FFTW initialized" << std::endl;
@@ -67,7 +67,7 @@ void Spectral::init(){
       if (k > grid.cells[2] / 2) k_s[2] = k_s[2] - grid.cells[2];
       for (int i = 0; i < grid.cells0_reduced; ++i) {
         k_s[0] = i;
-        freq_derivative = get_freq_derivative(k_s);
+        freq_derivative = get_freq_derivative(spectral_derivative_id, grid.cells, grid.geom_size, k_s);
         for (int p = 0; p < 3; ++p) xi2nd(p, i, k, j-grid.cells1_offset_tensor) = freq_derivative[p];
         loop_indices = {i,j,k};
         for (int p = 0; p < 3; ++p) {
@@ -82,38 +82,41 @@ void Spectral::init(){
       }
     }
   }
-  homogenization_fetch_tensor_pointers(); // initialize homogenization array pointers to point to the fortran definitions
+  homogenization_fetch_tensor_pointers(grid.n_cells_global); // initialize homogenization array pointers to point to the fortran definitions
 }
 
-std::array<std::complex<double>, 3> Spectral::get_freq_derivative(std::array<int, 3>& k_s) {
-    std::array<std::complex<double>, 3> freq_derivative;
-    switch (config.num_grid.spectral_derivative_id) {
-        case Config::DERIVATIVE_CONTINUOUS_ID:
-            for (int i = 0; i < 3; ++i) {
-                freq_derivative[i] = std::complex<double>(0.0, TAU * k_s[i] / grid.geom_size[i]);
-            }
-            break;
-        case Config::DERIVATIVE_CENTRAL_DIFF_ID:
-            for (int i = 0; i < 3; ++i) {
-                freq_derivative[i] = std::complex<double>(0.0, sin(TAU * k_s[i] / grid.cells[i])) /
-                                     std::complex<double>(2.0 * grid.geom_size[i] / grid.cells[i], 0.0);
-            }
-            break;
-        case Config::DERIVATIVE_FWBW_DIFF_ID:
-            for (int i = 0; i < 3; ++i) {
-                freq_derivative[i] = (std::complex<double>(cos(TAU * k_s[i] / grid.cells[i]) - (i == 0 ? 1.0 : -1.0),
-                                                      sin(TAU * k_s[i] / grid.cells[i])) *
-                                      std::complex<double>(cos(TAU * k_s[(i + 1) % 3] / grid.cells[(i + 1) % 3]) + 1.0,
-                                                      sin(TAU * k_s[(i + 1) % 3] / grid.cells[(i + 1) % 3])) *
-                                      std::complex<double>(cos(TAU * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3]) + 1.0,
-                                                      sin(TAU * k_s[(i + 2) % 3] / grid.cells[(i + 2) % 3])) /
-                                      std::complex<double>(4.0 * grid.geom_size[i] / grid.cells[i]), 0.0);
-            }
-            break;
-        default:
-            throw std::runtime_error("Invalid spectral_derivative_ID value.");
-    }
-    return freq_derivative;
+std::array<std::complex<double>, 3> Spectral::get_freq_derivative(int spectral_derivative_id, 
+                                                                  std::array<int, 3> cells, 
+                                                                  std::array<double, 3> geom_size, 
+                                                                  std::array<int, 3>& k_s) {
+  std::array<std::complex<double>, 3> freq_derivative;
+  switch (spectral_derivative_id) {
+    case Config::DERIVATIVE_CONTINUOUS_ID:
+      for (int i = 0; i < 3; ++i) {
+        freq_derivative[i] = std::complex<double>(0.0, TAU * k_s[i] / geom_size[i]);
+      }
+      break;
+    case Config::DERIVATIVE_CENTRAL_DIFF_ID:
+      for (int i = 0; i < 3; ++i) {
+        freq_derivative[i] =  std::complex<double>(0.0, sin(TAU * k_s[i] / cells[i])) /
+                              std::complex<double>(2.0 * geom_size[i] / cells[i], 0.0);
+      }
+      break;
+    case Config::DERIVATIVE_FWBW_DIFF_ID:
+      for (int i = 0; i < 3; ++i) {
+        freq_derivative[i] =  (std::complex<double>(cos(TAU * k_s[i] / cells[i]) - (i == 0 ? 1.0 : -1.0),
+                                                    sin(TAU * k_s[i] / cells[i])) *
+                               std::complex<double>(cos(TAU * k_s[(i + 1) % 3] / cells[(i + 1) % 3]) + 1.0,
+                                                    sin(TAU * k_s[(i + 1) % 3] / cells[(i + 1) % 3])) *
+                               std::complex<double>(cos(TAU * k_s[(i + 2) % 3] / cells[(i + 2) % 3]) + 1.0,
+                                                    sin(TAU * k_s[(i + 2) % 3] / cells[(i + 2) % 3])) /
+                               std::complex<double>(4.0 * geom_size[i] / cells[i]), 0.0);
+      }
+      break;
+    default:
+      throw std::runtime_error("Invalid spectral_derivative_ID value.");
+  }
+  return freq_derivative;
 }
 
 void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P, 
@@ -124,20 +127,19 @@ void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P,
                                       double Delta_t,
                                       std::optional<Eigen::Quaterniond> rot_bc_q) {
 
-  std::cout << F.dimension(2);
   Tensor<double, 3> homogenization_F;
-  homogenization_F = F.reshape(Eigen::array<int, 3>({3, 3, grid.cells[0] * grid.cells[1] * grid.cells2}));
+  int n_cells = P.dimension(2) * P.dimension(3) * P.dimension(4);
+  homogenization_F = F.reshape(Eigen::array<int, 3>({3, 3, n_cells}));
 
   int cell_start = 1;
-  int n_cells = grid.cells[0] * grid.cells[1] * grid.cells2;
   mechanical_response(Delta_t, cell_start, n_cells);
   if (!*terminally_ill)
     thermal_response(Delta_t, cell_start, n_cells);
 
   if (!*terminally_ill) {
-      std::array<int, 2> FEsolving_execIP = {1, 1};
-      std::array<int, 2> FEsolving_execElem = {1, n_cells};
-      mechanical_response2(Delta_t, FEsolving_execIP, FEsolving_execElem);
+    std::array<int, 2> FEsolving_execIP = {1, 1};
+    std::array<int, 2> FEsolving_execElem = {1, n_cells};
+    mechanical_response2(Delta_t, FEsolving_execIP, FEsolving_execElem);
   }
 
   P = homogenization_P->reshape(F.dimensions());

@@ -8,9 +8,9 @@
 #include <limits>
 #include <iomanip> 
 
-template <typename T, int N>
-bool tensor_eq(const Eigen::Tensor<T, N>& tensor1, const Eigen::Tensor<T, N>& tensor2, double epsilon = 1e-8) {
-    assert(tensor1.dimensions() == tensor2.dimensions());
+template <typename T1, typename T2>
+bool tensor_eq(const T1& tensor1, const T2& tensor2, double epsilon = 1e-8) {
+    // assert(tensor1.dimensions() == tensor2.dimensions());
     bool mismatch_found = false;
     for (Eigen::Index i = 0; i < tensor1.size(); ++i) {
         if (std::abs(tensor1.data()[i] - tensor2.data()[i]) > epsilon) {
@@ -18,17 +18,17 @@ bool tensor_eq(const Eigen::Tensor<T, N>& tensor1, const Eigen::Tensor<T, N>& te
                 std::cout << "Mismatch found between tensors:" << std::endl;
                 mismatch_found = true;
             }
-            Eigen::array<Eigen::Index, N> index;
+            Eigen::array<Eigen::Index, T1::NumDimensions> index;
             Eigen::Index idx = i;
-            for (int d = 0; d < N; ++d) {
+            for (int d = 0; d < T1::NumDimensions; ++d) {
                 index[d] = idx % tensor1.dimension(d);
                 idx /= tensor1.dimension(d);
             }
 
             std::cout << "At index (";
-            for (int d = 0; d < N; ++d) {
+            for (int d = 0; d < T1::NumDimensions; ++d) {
                 std::cout << index[d];
-                if (d < N - 1) {
+                if (d < T1::NumDimensions - 1) {
                     std::cout << ", ";
                 }
             }
@@ -42,6 +42,7 @@ bool tensor_eq(const Eigen::Tensor<T, N>& tensor1, const Eigen::Tensor<T, N>& te
         return false;
     }
 }
+
 
 template <typename T, int N>
 void fill_random(Eigen::TensorMap<Eigen::Tensor<T, N>>& tensor_map) {

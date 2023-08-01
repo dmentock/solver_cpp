@@ -37,17 +37,25 @@ subroutine mechanical_init()
   allocate(homogenization_P(3,3,discretization_Ncells),source=0.0_pReal)
 end subroutine mechanical_init
 
-subroutine homogenization_fetch_tensor_pointers(c_homog_F0, c_homog_F, &
-                                c_homog_P, &
-                                c_homog_dPdF, &
-                                c_terminallyIll) &
+subroutine homogenization_fetch_tensor_pointers(n_cells_global, &
+                                                c_homog_F0, &
+                                                c_homog_F, &
+                                                c_homog_P, &
+                                                c_homog_dPdF, &
+                                                c_terminallyIll) &
   bind(C, name="f_homogenization_fetch_tensor_pointers")
 
+  integer, intent(in) :: n_cells_global
   type(c_ptr), intent(out) :: &
     c_homog_F0, c_homog_F, &
     c_homog_P, &
     c_homog_dPdF, &
     c_terminallyIll
+
+  ! allocate(homogenization_F0(3,3,n_cells_global),source=0.0_pReal)
+  ! allocate(homogenization_F(3,3,n_cells_global),source=0.0_pReal)
+  ! allocate(homogenization_P(3,3,n_cells_global),source=0.0_pReal)
+  ! allocate(homogenization_dPdF(3,3,3,3,n_cells_global),source=0.0_pReal)
 
   c_homog_F0 = c_loc(homogenization_F0)
   c_homog_F = c_loc(homogenization_F)

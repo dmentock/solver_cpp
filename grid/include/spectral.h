@@ -16,7 +16,8 @@ using namespace std;
 using namespace Eigen;
 
 extern "C" {
-  void f_homogenization_fetch_tensor_pointers(double** homogenization_F0, double** homogenization_F, 
+  void f_homogenization_fetch_tensor_pointers(int* n_cells_global,
+                                              double** homogenization_F0, double** homogenization_F,
                                               double** homogenization_P, double** homogenization_dPdF,
                                               void** terminally_ill);
   void f_homogenization_mechanical_response(double* Delta_t, int* cell_start, int* cell_end);
@@ -26,11 +27,11 @@ extern "C" {
 
 class Spectral {
 public:
-  Spectral(Config& config_, DiscretizationGrid& grid_)
-      : config(config_), grid(grid_) {}
-
-  void init();
-  virtual std::array<std::complex<double>, 3> get_freq_derivative(std::array<int, 3>& k_s);
+  void init(int spectral_derivative_id, DiscretizationGrid& grid);
+  virtual std::array<std::complex<double>, 3> get_freq_derivative(int spectral_derivative_id, 
+                                                                  std::array<int, 3> cells, 
+                                                                  std::array<double, 3> geom_size, 
+                                                                  std::array<int, 3>& k_s);
   virtual void constitutive_response (TensorMap<Tensor<double, 5>> &P,
                                       Tensor<double, 2> &P_av, 
                                       Tensor<double, 4> &C_volAvg, 
@@ -39,20 +40,21 @@ public:
                                       double Delta_t,
                                       std::optional<Eigen::Quaterniond> rot_bc_q = std::nullopt);   
 
-  virtual void homogenization_fetch_tensor_pointers() {
-    double* homogenization_F0_ptr;
-    double* homogenization_F_ptr;
-    double* homogenization_P_ptr;
-    double* homogenization_dPdF_ptr;
-    void* raw_terminally_ill_ptr;
-    f_homogenization_fetch_tensor_pointers (&homogenization_F0_ptr, &homogenization_F_ptr, 
-                                            &homogenization_P_ptr, &homogenization_dPdF_ptr,
-                                            &raw_terminally_ill_ptr);
-    homogenization_F0 = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F0_ptr, 3, 3, grid.n_cells_global);
-    homogenization_F = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F_ptr, 3, 3, grid.n_cells_global);
-    homogenization_P = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_P_ptr, 3, 3, grid.n_cells_global);
-    homogenization_dPdF = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 5>>>(homogenization_dPdF_ptr, 3, 3, 3, 3, grid.n_cells_global);
-    terminally_ill = static_cast<bool*>(raw_terminally_ill_ptr);
+  virtual void homogenization_fetch_tensor_pointers(int n_cells_global) {
+    double* homogenization_F0_raw_ptr;
+    double* homogenization_F_raw_ptr;
+    double* homogenization_P_raw_ptr;
+    double* homogenization_dPdF_raw_ptr;
+    void* raw_terminally_ill_raw_ptr;
+    f_homogenization_fetch_tensor_pointers (&n_cells_global, 
+                                            &homogenization_F0_raw_ptr, &homogenization_F_raw_ptr, 
+                                            &homogenization_P_raw_ptr, &homogenization_dPdF_raw_ptr,
+                                            &raw_terminally_ill_raw_ptr);
+    homogenization_F0 = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F0_raw_ptr, 3, 3, n_cells_global);
+    homogenization_F = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F_raw_ptr, 3, 3, n_cells_global);
+    homogenization_P = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_P_raw_ptr, 3, 3, n_cells_global);
+    homogenization_dPdF = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 5>>>(homogenization_dPdF_raw_ptr, 3, 3, 3, 3, n_cells_global);
+    terminally_ill = static_cast<bool*>(raw_terminally_ill_raw_ptr);
   }
 
   virtual void mechanical_response(double Delta_t, int cell_start, int cell_end);
@@ -76,16 +78,11 @@ public:
   unique_ptr<FFT<4>> vectorfield;
   unique_ptr<FFT<5>> tensorfield;
 
-  struct BoundaryCondition {
-    Eigen::Matrix<double, 3, 3> values = Eigen::Matrix<double, 3, 3>::Zero();
-    Eigen::Matrix<bool, 3, 3> mask = Eigen::Matrix<bool, 3, 3>::Constant(true);
-    std::string type;
-      };
-
-protected:
-
-  DiscretizationGrid& grid;
-  Config& config;
+  struct SolutionState {
+    bool converged;
+    int iterationsNeeded;
+    bool terminally_ill;
+  };
 
 private:
   const double TAU = 2 * M_PI;

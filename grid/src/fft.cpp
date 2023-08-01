@@ -8,7 +8,7 @@
 
 
 template <int Rank>
-void FFT<Rank>::init_fft (std::array<int, 3>& cells,
+void FFT<Rank>::init (std::array<int, 3>& cells,
                           int cells2,
                           std::vector<int>& extra_dims,
                           int fftw_planner_flag,
@@ -94,11 +94,10 @@ Tensor<double, Rank> FFT<Rank>::get_field_real() {
 template <int Rank>
 Tensor<std::complex<double>, Rank> FFT<Rank>::get_field_fourier() {
   Tensor<std::complex<double>, Rank> field_fourier_ = *field_fourier;
+
   return field_fourier_;
 }
-
 
 template class FFT<3>;
 template class FFT<4>;
 template class FFT<5>;
-
