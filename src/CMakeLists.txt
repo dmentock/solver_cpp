@@ -48,7 +48,11 @@ target_link_libraries(f_clean_up_fortran
                       PUBLIC
                       f_homogenization)
 
-
+add_library(f_materialpoint SHARED materialpoint.f90)
+target_link_libraries(f_materialpoint
+                      PUBLIC
+                      f_homogenization)
+                      
 # add_library(discretization discretization.cpp)
 
 add_library(config config.cpp)

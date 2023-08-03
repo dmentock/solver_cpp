@@ -42,3 +42,14 @@ add_library(mech_solver_basic mech_solver_basic.cpp)
 target_link_libraries(mech_solver_basic 
                       PUBLIC
                       mech_base)
+
+add_library(damask_grid_lib damask_grid.cpp)
+# add_executable(damask_grid damask_grid.cpp)
+target_link_libraries(damask_grid_lib 
+                      PUBLIC
+                      spectral
+                      discretization_grid
+                      config
+                      mech_base
+                      mech_solver_basic
+                      f_materialpoint)

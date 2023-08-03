@@ -10,6 +10,7 @@ add_executable(test_cpp_fortran_interface test_cpp_fortran_interface.cpp)
 target_link_libraries(test_cpp_fortran_interface
                       PUBLIC
                       stub_fortran_interface
+                      ${PETSC_ARCH_DIR}/lib/libpetsc.so
                       GTest::GTest
                       GTest::Main
                       gmock gmock_main)
@@ -52,6 +53,15 @@ target_link_libraries(test_mech_solver_basic
                       PUBLIC
                       mech_solver_basic
                       ${PETSC_ARCH_DIR}/lib/libpetsc.so
+                      GTest::GTest 
+                      GTest::Main 
+                      gmock gmock_main)
+
+add_executable(test_damask_grid test_damask_grid.cpp)
+target_link_libraries(test_damask_grid
+                      PUBLIC
+                      damask_grid_lib
+                      f_homogenization
                       GTest::GTest 
                       GTest::Main 
                       gmock gmock_main)
