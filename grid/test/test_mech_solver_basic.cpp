@@ -223,22 +223,10 @@ TEST_F(GridTestSetup, TestBasicForward) {
   spectral.homogenization_F0 = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F0_.data(), 3, 3, 2);
   mech_basic.forward(false, false, 100.2, 1, 1002, deformation_bc, stress_bc, rot_bc_q);
 
-  PetscScalar ****F_res;
-  DMDAVecGetArrayDOF(mech_basic.da, mech_basic.solution_vec, &F_res);
-  PetscInt xs, ys, zs, xm, ym, zm;
-  DMDAGetCorners(mech_basic.da, &xs, &ys, &zs, &xm, &ym, &zm);
-  Eigen::Tensor<double, 5> F(3, 3, xm, ym, zm);
-  for (int l = 0; l < 3; ++l) {
-    for (int m = 0; m < 3; ++m) {
-      for (int i = 0; i < xm; ++i) {
-        for (int j = 0; j < ym; ++j) {
-          for (int k = 0; k < zm; ++k) {
-            F(l, m, i, j, k) = F_res[k][j][i][l+m*3];
-          }
-        }
-      }
-    }
-  }
+  double* F_res;
+  ierr = VecGetArray(mech_basic.solution_vec, &F_res);
+  CHKERRABORT(PETSC_COMM_WORLD, ierr);
+  TensorMap<Tensor<double, 5>> F(reinterpret_cast<double*>(F_res),  3, 3, mock_grid.cells[0], mock_grid.cells[1], mock_grid.cells2);
   EXPECT_TRUE(tensor_eq(F, forwarded_field));
   EXPECT_EQ(mech_basic.params.delta_t, 100.2);
   EXPECT_EQ(mech_basic.params.rot_bc_q, rot_bc_q);
