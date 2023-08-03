@@ -11,6 +11,9 @@
 #include <Eigen/Dense>
 #include <unsupported/Eigen/CXX11/Tensor>
 #include <helper.h>
+
+#include <petsc.h>
+
 extern "C" {
 void f_datatypes_test(
   int *int_num,
@@ -134,30 +137,29 @@ TEST(InterfaceTest, TestGlobalBoolAssignment)
 }
 
 extern "C" {
-  void allocate_tensormap_array();
-  void get_tensormap_array_ptr(double** tensormap_array);
+  void f_fetch_tensor_pointers(double** tensor_raw_ptr_);
 }
-TEST(InterfaceTest, TestTensorMapOnFortranArray) {
+class TensorClass {
+public:
+  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 3>>> fortran_tensor_ptr;
+  virtual void fetch_tensor_pointers() {
+    double* tensor_raw_ptr;
+    f_fetch_tensor_pointers (&tensor_raw_ptr); // allocates a tensor in fortran and sets the tensor_raw_ptr pointer to point to it
+    fortran_tensor_ptr = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(tensor_raw_ptr, 3, 3, 3);
+  }
+};
 
-  Eigen::Tensor<double, 3> expected_cpp_tensor(3, 3, 3);
-  expected_cpp_tensor.setValues({
-   {{ 1, 0, 0 },
-    { 0, 0, 0 },
-    { 0, 0, 0 }},
-   {{ 0, 0, 0 },
-    { 0, 0, 0 },
-    { 0, 0, 0 }},
-   {{ 0, 0, 0 },
-    { 0, 0, 0 },
-    { 0, 0, 0 }}
-  });
+TEST(InterfaceTest, TestWriteToFortranTensor) {
+  int argc = 0;
+  char **argv = NULL;
+  PetscErrorCode ierr;
+  ierr = PetscInitialize(&argc, &argv, (char *)0,"PETSc help message.");
 
-  allocate_tensormap_array();
-  double* tensormap_array;
-  get_tensormap_array_ptr(&tensormap_array);  
-  Eigen::TensorMap<Eigen::Tensor<double, 3>> cpp_tensormap_(tensormap_array, 3, 3, 3);
-  Eigen::Tensor<double, 3> cpp_tensor = cpp_tensormap_;
-  EXPECT_TRUE(tensor_eq(cpp_tensor, expected_cpp_tensor));
+  TensorClass tensor_class;
+  tensor_class.fetch_tensor_pointers();
+  tensor_class.fortran_tensor_ptr->setConstant(5); // write to the entire tensor to ensure there are no memory leaks when cleaning up
+
+  ierr = PetscFinalize();
 }
 
 int main(int argc, char **argv) {

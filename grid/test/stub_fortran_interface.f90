@@ -1,11 +1,16 @@
 module fortran_testmodule
   use iso_c_binding
+  use, intrinsic :: IEEE_arithmetic
+
   implicit none
 
   double precision, pointer :: my_global_ndarray(:,:,:)
   logical, target :: my_global_boolean = .false.
   double precision, dimension(:,:,:), target, allocatable :: tensormap_array_
 
+  integer,     parameter :: pREAL      = IEEE_selected_real_kind(15,307)
+  real(pReal),   dimension(:,:,:),   allocatable,   target, public :: &
+    tensor
 contains
 
 subroutine datatypes_test(int_num,&
@@ -97,8 +102,22 @@ end subroutine allocate_tensormap_array
 subroutine get_tensormap_array_ptr(tensormap_array) bind(C, name="get_tensormap_array_ptr")
   type(c_ptr), intent(out) :: tensormap_array
 
+  allocate(tensormap_array_(3,3,3))
   tensormap_array = c_loc(tensormap_array_)
 
 end subroutine get_tensormap_array_ptr
+
+  subroutine fetch_tensor_pointers(tensor_ptr) &
+    bind(C, name="f_fetch_tensor_pointers")
+
+    type(c_ptr), intent(out) :: &
+      tensor_ptr
+
+    allocate(tensor(3,3,3))
+    tensor_ptr = c_loc(tensor)
+
+  end subroutine fetch_tensor_pointers
+
+
 
 end module fortran_testmodule
