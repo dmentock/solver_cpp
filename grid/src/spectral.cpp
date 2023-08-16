@@ -155,7 +155,7 @@ void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P,
     }
     P_av = FortranUtilities::rotate_tensor2(rot_bc_q.value(), P_av);
   }
-  std::cout << "Piola--Kirchhoff stress       / MPa = " << P_av.shuffle(P_transpose_dims) * 1.e-6 << std::endl;
+  std::cout << "Piola--Kirchhoff stress       / MPa = " << P_av.shuffle(P_transpose_dims) * 1e-6 << std::endl;
 
   Eigen::Tensor<double, 4> dPdF_max(3, 3, 3, 3);
   dPdF_max.setZero();

@@ -64,10 +64,12 @@ void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double
       for (int i = 0; i < grid.cells0_reduced ; ++i) {
         std::array<int, 3> indices = {i, j + grid.cells1_offset_tensor, k};
         if (std::any_of(indices.begin(), indices.end(), [](int x) { return x != 0; })) {
-          Tensor<complex<double>, 2> tensor_slice = tensorfield_fourier.slice(Eigen::array<Index, 5>({0, 0, i, k, j}),
-                                  Eigen::array<Eigen::Index, 5>({3, 3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 2>({3, 3}));
-          Tensor<complex<double>, 1>  xi2_slice = spectral.xi2nd.slice(Eigen::array<Eigen::Index, 4>({0, i, k, j}),
-              Eigen::array<Eigen::Index, 4>({3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 1>({3}));
+          Tensor<complex<double>, 2> tensor_slice = tensorfield_fourier.slice(
+            Eigen::array<Index, 5>({0, 0, i, k, j}),
+            Eigen::array<Index, 5>({3, 3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 2>({3, 3}));
+          Tensor<complex<double>, 1> xi2_slice = spectral.xi2nd.slice(
+            Eigen::array<Index, 4>({0, i, k, j}),
+            Eigen::array<Index, 4>({3, 1, 1, 1})).reshape(Eigen::array<Eigen::Index, 1>({3}));
           Eigen::array<Eigen::IndexPair<int>, 1> product_dims = {Eigen::IndexPair<int>(1, 0)};
           Tensor<complex<double>, 1> result = tensor_slice.contract(xi2_slice, product_dims);
           Eigen::Array<complex<double>, 3, 1> xi2_array;
@@ -75,8 +77,8 @@ void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double
           complex<double> denominator = (xi2_array.conjugate() * xi2_array).sum();
           for (Eigen::Index l = 0; l < 3; ++l) (*spectral.vectorfield->field_fourier)(l,i,k,j) = result(l)/denominator;
         } else {
-          (*spectral.vectorfield->field_fourier).slice(Eigen::array<Eigen::Index, 4>({0, i, k, j}),
-                                                       Eigen::array<Eigen::Index, 4>({3, 1, 1, 1})).setZero();
+          spectral.vectorfield->field_fourier->slice(Eigen::array<Eigen::Index, 4>({0, i, k, j}),
+                                                     Eigen::array<Eigen::Index, 4>({3, 1, 1, 1})).setConstant(std::complex<double>(0, 0));
         }
       }
     }
@@ -86,7 +88,7 @@ void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double
   u_tilde_p_padded.slice (Eigen::array<Eigen::Index, 4>({0, 0, 0, 1}),
                           Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2})) = 
   vectorfield_real.slice (Eigen::array<Eigen::Index, 4>({0, 0, 0, 0}),
-                          Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2}))*spectral.wgt;
+                          Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2})) * spectral.wgt;
 
   // Pad cell center fluctuations along z-direction (needed when running MPI simulation)
   int c = 3 * grid.cells[0] * grid.cells[1]; // amount of data to transfer
@@ -119,8 +121,7 @@ void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double
   Eigen::array<Eigen::IndexPair<int>, 1> product_dims = {Eigen::IndexPair<int>(1, 0)};
   Eigen::Array<double, 3, 1> step(grid.geom_size[0] / grid.cells[0], grid.geom_size[1] / grid.cells[1], grid.geom_size[2] / grid.cells[2]);
 
-  x_n_.resize(3, (grid.cells[0] + 1) * (grid.cells[1] + 1) * (grid.cells2 + 1));
-  x_n_.setConstant(0);
+  x_n_.setZero();
   TensorMap<Tensor<double, 4>> x_n(x_n_.data(), 
       Eigen::array<Eigen::Index, 4>({3, grid.cells[0] + 1, grid.cells[1] + 1, grid.cells2 + 1}));
   for (int j = 0; j <= grid.cells[1]; j++) {
@@ -144,7 +145,6 @@ void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double
   }
 
   // Calculate cell center/point positions
-  x_p_.resize(3, grid.cells[0] * grid.cells[1] * grid.cells2);
   TensorMap<Tensor<double, 4>> x_p(x_p_.data(), 
       Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2}));
   for (int k = 0; k < grid.cells2; ++k) {

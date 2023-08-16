@@ -67,7 +67,10 @@ public:
   template <int Rank>
   FFT<Rank>* gridTestSetup_init_fft (MockDiscretizedGrid& mock_grid) {
     ptrdiff_t cells2_fftw, cells1_fftw, cells1_offset;
-    std::vector<int> extra_dims = {3, 3};
+    std::vector<int> extra_dims;
+    for (Eigen::Index i = 0; i < Rank-3; ++i) {
+      extra_dims.push_back(3);
+    }
     FFT<Rank>* fft_obj = new FFT<Rank>(mock_grid.cells, mock_grid.cells2, extra_dims, 0, &cells1_fftw, &cells1_offset, &cells2_fftw);
     return fft_obj;
   }

@@ -150,8 +150,7 @@ TEST_F(GridTestSetup, TestMechSolverBasicSolution) {
   bool terminally_ill;
   spectral.terminally_ill = &terminally_ill;
 
-  Spectral::SolutionState solution = mech_basic.calculate_solution("test");
-  // cout << "ss " << solution << endl;
+  Config::SolutionState solution = mech_basic.calculate_solution("test");
   EXPECT_EQ(*spectral.terminally_ill, false);
 }
 

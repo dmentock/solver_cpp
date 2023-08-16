@@ -20,7 +20,7 @@ void FFT<Rank>::init (std::array<int, 3>& cells,
 
   ptrdiff_t N, cells2_offset;
   ptrdiff_t fftw_dims[3] = {cells[2], cells[1], cells0_reduced};
-  int size = (extra_dims.size() > 1) ? std::accumulate(extra_dims.begin(), extra_dims.end(), 1, std::multiplies<int>()) : 1;
+  int size = std::accumulate(extra_dims.begin(), extra_dims.end(), 1, std::multiplies<int>());
 
   N = fftw_mpi_local_size_many_transposed(3, fftw_dims, size, 
                                           FFTW_MPI_DEFAULT_BLOCK, FFTW_MPI_DEFAULT_BLOCK,
@@ -38,7 +38,6 @@ void FFT<Rank>::init (std::array<int, 3>& cells,
   dims_fourier_.insert(dims_fourier_.end(), {cells0_reduced, cells[2], *cells1_fftw});
   std::copy_n(dims_fourier_.begin(), Rank, dims_fourier.begin());
   field_fourier.reset(new TensorMap<Tensor<std::complex<double>, Rank>>(reinterpret_cast<std::complex<double>*>(field_fourier_fftw), dims_fourier));
-
   std::array<ptrdiff_t, 3> cells_reversed = {cells[2], cells[1], cells[0]};
 
   plan_forth = fftw_mpi_plan_many_dft_r2c(3, cells_reversed.data(), size,

@@ -104,6 +104,11 @@ TEST_F(GridTestSetup, MechBaseTestUpdateCoords) {
   });
   TensorMap<Tensor<double, 5>> F(F_.data(), 3, 3, 2, 1, 1);
 
+  Eigen::Tensor<double, 2> x_n(3, 12);
+  x_n.setZero();
+  Eigen::Tensor<double, 2> x_p(3, 2);
+  x_p.setZero();
+
   Eigen::Tensor<double, 2> expected_x_n(3, 12);
   expected_x_n.setValues({
    {  0   ,  1e-05, 2e-05,  0    ,  1e-05,  2e-05,  0    ,  1e-05,  2e-05,  0    ,  1e-05,  2e-05 },
