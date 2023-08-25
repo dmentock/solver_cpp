@@ -32,7 +32,7 @@ public:
 
   // Abstract solver interface
   virtual void init() = 0;
-  virtual Spectral::SolutionState calculate_solution(std::string inc_info_) = 0;
+  virtual Config::SolutionState calculate_solution(std::string& inc_info_) = 0;
   virtual void forward (bool cutBack, bool guess, double Delta_t, double Delta_t_old, double t_remaining,
                 Config::BoundaryCondition& deformation_BC, 
                 Config::BoundaryCondition& stress_BC, 
@@ -104,7 +104,7 @@ public:
   // double err_BC;
   // double err_div;
 
-  SolutionParams params;
+  Config::SolutionParams params;
 
   DM da;
   SNES SNES_mechanical;
@@ -113,8 +113,8 @@ public:
   int total_iter = 0;
   std::string inc_info;
 
-  double err_BC;
-  double err_div;
+  double err_BC = 0;
+  double err_div = 0;
 
   Tensor<double, 4> S; 
   Spectral& spectral;

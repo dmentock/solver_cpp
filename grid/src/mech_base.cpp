@@ -356,6 +356,7 @@ void MechBase::gamma_convolution(TensorMap<Tensor<double, 5>> &field, Tensor<dou
 
   Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(field);
   Eigen::Matrix<complex<double>, 3, 3> temp33_cmplx;
+  temp33_cmplx.setZero();
   if (config.numerics.memory_efficient) {
     Eigen::Matrix<double, 6, 6> A;
     Eigen::Matrix<double, 6, 6> A_inv;
