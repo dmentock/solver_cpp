@@ -121,19 +121,21 @@ TEST_F(GridTestSetup, TestMechSolverBasicSolution) {
         : MechSolverBasic(config_, grid_, spectral_) {};
     MOCK_METHOD(Tensor4d, calculate_masked_compliance, (Tensor4d&, Eigen::Quaterniond&, Matrix33b&), (override));
     MOCK_METHOD(void, update_gamma, (Tensor4d&), (override));
-    static PetscErrorCode formResidual(DMDALocalInfo* residual_subdomain, void* F_raw, void* r_raw, void *ctx) { return 0; }  
-    static PetscErrorCode converged(SNES snes_local, PetscInt PETScIter, 
-                                    PetscReal devNull1, PetscReal devNull2, 
-                                    PetscReal fnorm, SNESConvergedReason *reason, 
-                                    void *ctx) { return 0; }
+    static PetscErrorCode mock_residual(DMDALocalInfo* residual_subdomain, double*** F_ptr, double*** r_ptr, void* ctx) {
+      MechSolverBasic* mech_basic = static_cast<MechSolverBasic*>(ctx);
+      TensorMap<Tensor<double, 5>> r(&r_ptr[0][0][0], 3, 3, mech_basic->grid.cells[0], mech_basic->grid.cells[1], mech_basic->grid.cells2);
+      r.setZero();
+      return 0;
+    }  
   };
   MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
-
+  gridSetup_init_discretization(mock_grid);
+  f_homogenization_init();
   PartialMockSpectral spectral(config, mock_grid);
   PartialMockMechSolverBasic mech_basic(config, mock_grid, spectral);
 
-  gridTestSetup_set_up_dm(mech_basic.da, mech_basic.solution_vec, mock_grid);
   gridTestSetup_set_up_snes(mech_basic.SNES_mechanical);
+  gridTestSetup_set_up_dm(mech_basic.da, mech_basic.solution_vec, mock_grid);
 
   Eigen::Tensor<PetscScalar, 4> F_(9, mock_grid.cells[0], mock_grid.cells[1], mock_grid.cells[2]);
   F_.setValues({
@@ -143,14 +145,18 @@ TEST_F(GridTestSetup, TestMechSolverBasicSolution) {
   });
   gridTestSetup_set_solution_vec(F_, mech_basic.solution_vec);
 
-  DMDASNESSetFunctionLocal(mech_basic.da, INSERT_VALUES, mech_basic.formResidual, this);
-  SNESSetConvergenceTest(mech_basic.SNES_mechanical, mech_basic.converged, PETSC_NULL, NULL);
+  DMDASNESSetFunctionLocal(mech_basic.da, INSERT_VALUES, (PetscErrorCode(*)(DMDALocalInfo *, void *, void *, void *)) mech_basic.mock_residual, &mech_basic);
   SNESSetDM(mech_basic.SNES_mechanical, mech_basic.da);
   SNESSetFromOptions(mech_basic.SNES_mechanical);
+
   bool terminally_ill;
   spectral.terminally_ill = &terminally_ill;
 
-  Config::SolutionState solution = mech_basic.calculate_solution("test");
+  std::string inc_info = ""; 
+  Tensor<double, 4> mocked_S;
+  EXPECT_CALL(mech_basic, calculate_masked_compliance(testing::_, testing::_, testing::_))
+                        .WillOnce(testing::Return(mocked_S));
+  Config::SolutionState solution = mech_basic.calculate_solution(inc_info);
   EXPECT_EQ(*spectral.terminally_ill, false);
 }
 
@@ -167,7 +173,6 @@ TEST_F(GridTestSetup, TestBasicForward) {
   PartialMockMechSolverBasicForward mech_basic(config, mock_grid, spectral);
 
   gridTestSetup_set_up_dm(mech_basic.da, mech_basic.solution_vec, mock_grid);
-
 
   Config::BoundaryCondition deformation_bc;
   deformation_bc.type = "dot_F";
@@ -246,9 +251,12 @@ TEST_F(GridTestSetup, TestFormResidual) {
   PartialMockSpectral spectral(config, mock_grid);
   PartialMockMechSolverBasic mech_basic(config, mock_grid, spectral);
 
-  DMDALocalInfo residual_subdomain;
+  DM da;
+  Vec F_vec;
 
-  Eigen::Tensor<double, 5> F(3, 3, 2, 1, 1);
+  gridTestSetup_set_up_dm(da, F_vec, mock_grid);
+
+  Tensor<double, 5>F(3, 3, 2, 1, 1);
   F.setValues({
    {{{{  1.1002000000000001 }}, {{  1.1002000000000001 }}},
     {{{  0                  }}, {{  0                  }}},
@@ -260,7 +268,8 @@ TEST_F(GridTestSetup, TestFormResidual) {
     {{{  0                  }}, {{  0                  }}},
     {{{  1                  }}, {{  1                  }}}}
   });
-  Eigen::Tensor<double, 5> r(3, 3, 2, 1, 1);
+
+  Tensor<double, 5> r(3, 3, 2, 1, 1);
   r.setZero();
 
   mech_basic.S.setValues({
@@ -357,7 +366,17 @@ TEST_F(GridTestSetup, TestFormResidual) {
   SNESCreate(PETSC_COMM_WORLD, &(mech_basic.SNES_mechanical));
   void* mech_basic_raw = static_cast<void*>(&mech_basic);
 
-  mech_basic.formResidual(&residual_subdomain, F.data(), r.data(), mech_basic_raw);
+  // Our residual function only looks at the first element of the nested pointer array and creates an eigen Tensor
+  // For testing, we just artificially recreate the nested array structure required by the petsc signature
+  // see residual function signature from petsc example: https://petsc.org/release/src/snes/tutorials/ex46.c.html
+  double* F_ptr = F.data();
+  double** F_ptr1 = &F_ptr;
+  double*** F_ptr2 = &F_ptr1;
+  double* r_ptr = r.data();
+  double** r_ptr1 = &r_ptr;
+  double*** r_ptr2 = &r_ptr1;
+  DMDALocalInfo residual_subdomain;
+  mech_basic.form_residual(&residual_subdomain, F_ptr2, r_ptr2, mech_basic_raw);
 
   EXPECT_EQ(mech_basic.err_div, 0);
   EXPECT_EQ(mech_basic.err_BC, 11717501649.529392);

@@ -24,7 +24,7 @@ public:
       : MechBase(config_, grid_, spectral_) {}
 
   virtual void init() {}
-  virtual Spectral::SolutionState calculate_solution(std::string inc_info_) {}
+  virtual Config::SolutionState calculate_solution(std::string& inc_info_) {}
   virtual void forward (bool cutBack, bool guess, double Delta_t, double Delta_t_old, double t_remaining,
                 Config::BoundaryCondition& deformation_BC, 
                 Config::BoundaryCondition& stress_BC, 
@@ -123,8 +123,6 @@ TEST_F(GridTestSetup, MechBaseTestUpdateCoords) {
    {  5e-06                ,  5e-06                 }
   });
 
-  Eigen::Tensor<double, 2> x_n;
-  Eigen::Tensor<double, 2> x_p;
   mech_utilities.base_update_coords(F, x_n, x_p);
   EXPECT_TRUE(tensor_eq(x_n, expected_x_n));
   EXPECT_TRUE(tensor_eq(x_p, expected_x_p));

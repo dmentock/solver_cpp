@@ -127,8 +127,8 @@ void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P,
                                       double Delta_t,
                                       std::optional<Eigen::Quaterniond> rot_bc_q) {
 
-  Tensor<double, 3> homogenization_F;
   int n_cells = P.dimension(2) * P.dimension(3) * P.dimension(4);
+  Tensor<double, 3> homogenization_F(3, 3, n_cells);
   homogenization_F = F.reshape(Eigen::array<int, 3>({3, 3, n_cells}));
 
   int cell_start = 1;
@@ -187,7 +187,7 @@ void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P,
   broadcast_rank = static_cast<int>(valueAndRank[1]);
   MPI::COMM_WORLD.Bcast(dPdF_min.data(), 81, MPI::DOUBLE, broadcast_rank);
 
-  Eigen::Tensor<double, 4> C_minmaxAvg = 0.5 * (dPdF_max + dPdF_min);
+  C_minMaxAvg = 0.5 * (dPdF_max + dPdF_min);
   C_volAvg = homogenization_dPdF->sum(Eigen::array<int, 1>{4});
   
   MPI::COMM_WORLD.Allreduce(MPI_IN_PLACE, C_volAvg.data(), 81, MPI::DOUBLE, MPI::SUM);

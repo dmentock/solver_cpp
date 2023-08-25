@@ -53,9 +53,10 @@ void MechSolverBasic::init() {
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
   ierr = DMCreateGlobalVector(da, &solution_vec);
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
-  ierr = DMDASNESSetFunctionLocal(da, INSERT_VALUES, formResidual, this);
+  ierr = DMDASNESSetFunctionLocal(da, INSERT_VALUES, 
+                                  (PetscErrorCode(*)(DMDALocalInfo *, void *, void *, void *)) form_residual, this);
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
-  ierr = SNESSetConvergenceTest(SNES_mechanical, converged, PETSC_NULL, NULL);
+  ierr = SNESSetConvergenceTest(SNES_mechanical, converged, this, PETSC_NULL);
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
   ierr = SNESSetDM(SNES_mechanical, da);
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
@@ -69,46 +70,48 @@ void MechSolverBasic::init() {
   for (int i = 0; i < 3; ++i) {
     for (int j = 0; j < 3; ++j) {
       F_last_inc.slice(Eigen::array<Index, 5>({i, j, 0, 0, 0}),
-                      Eigen::array<Index, 5>({1, 1, grid.cells[0], grid.cells[1], grid.cells2}))
+                      Eigen::array<Index, 5>({1, 1, grid.cells[0], grid.cells[1], grid.cells[2]}))
         .setConstant(math_I3(i, j));
     }
   }
 
   double* F_raw;
   ierr = VecGetArray(solution_vec, &F_raw);
+
+
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
-  TensorMap<Tensor<double, 5>> F(reinterpret_cast<double*>(F_raw),  3, 3, grid.cells[0], grid.cells[1], grid.cells2);
-  F = F_last_inc;
+  TensorMap<Tensor<double, 5>> F(F_raw,  3, 3, grid.cells[0], grid.cells[1], grid.cells2);
+
+  std::memcpy(F.data(), F_last_inc.data(), sizeof(double) * F.size());
   *spectral.homogenization_F0 = F_last_inc.reshape(Eigen::DSizes<Eigen::DenseIndex, 3>(3, 3, grid.cells[0]*grid.cells[1]*grid.cells2));
   Tensor<double, 2> x_n(3, 12);
-  Tensor<double, 2> x_p(3, 2);
+  Tensor<double, 2> x_p(3, 12);
 
   base_update_coords(F, x_n, x_p); // fix after implementing restart
 
   Tensor<double, 5> P(3, 3, grid.cells[0], grid.cells[1], grid.cells[2]);
   TensorMap<Tensor<double, 5>> P_map(P.data(), 3, 3, grid.cells[0], grid.cells[1], grid.cells2);
-  TensorMap<Tensor<double, 5>> F_map(F_last_inc.data(), 3, 3, grid.cells[0], grid.cells[1], grid.cells[2]);
   P_av.resize(3, 3);
   C_volAvg.resize(3, 3, 3, 3);
   C_minMaxAvg.resize(3, 3, 3, 3);
+
   spectral.constitutive_response (P_map,
                                   P_av,
                                   C_volAvg,
                                   C_minMaxAvg,
-                                  F_map,
+                                  F,
                                   0);
-  ierr = VecRestoreArray(solution_vec, &F_raw);
-  CHKERRABORT(PETSC_COMM_WORLD, ierr);
+
   // add restart calls 253-268
   update_gamma(C_minMaxAvg);
   C_minMaxAvgRestart = C_minMaxAvg;
 }
 
-Spectral::SolutionState MechSolverBasic::calculate_solution(std::string inc_info_) {
+Config::SolutionState MechSolverBasic::calculate_solution(std::string& inc_info_) {
 
   inc_info = inc_info_;
 
-  Spectral::SolutionState solution;
+  Config::SolutionState solution;
   SNESConvergedReason reason;
 
   // update stiffness (and gamma operator)
@@ -121,7 +124,7 @@ Spectral::SolutionState MechSolverBasic::calculate_solution(std::string inc_info
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
 
   solution.converged = reason > 0;
-  solution.iterationsNeeded = total_iter;
+  solution.required_iterations = total_iter;
   solution.terminally_ill = *spectral.terminally_ill;
   *spectral.terminally_ill = false;
   P_aim = P_av;
@@ -133,6 +136,7 @@ void MechSolverBasic::forward(bool cutBack, bool guess, double delta_t, double d
                               Config::BoundaryCondition& deformation_bc, 
                               Config::BoundaryCondition& stress_bc, 
                               Quaterniond& rot_bc_q) {
+  PetscErrorCode ierr;
   PetscScalar *F_raw;
   ierr = VecGetArray(solution_vec, &F_raw); 
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
@@ -226,16 +230,16 @@ PetscErrorCode MechSolverBasic::converged(SNES snes_local,
   std::cout << "error stress BC  = " << mech_basic->err_BC / BCTol << " (" << mech_basic->err_BC << " Pa,  tol = " << BCTol << ")" << std::endl;
   std::cout << "\n===========================================================================" << std::endl;
 
+  exit(10);
   return 0;
 }
 
-PetscErrorCode MechSolverBasic::formResidual(DMDALocalInfo* residual_subdomain, void* F_raw, void* r_raw, void *ctx) {
+PetscErrorCode MechSolverBasic::form_residual(DMDALocalInfo* residual_subdomain, double*** F_ptr, double*** r_ptr, void *ctx) {
 
   MechSolverBasic* mech_basic = static_cast<MechSolverBasic*>(ctx);
-  double* F_ = static_cast<double*>(F_raw);
-  double* r_ = static_cast<double*>(r_raw);
-  TensorMap<Tensor<double, 5>> F(F_, 3, 3, mech_basic->grid.cells[0], mech_basic->grid.cells[1], mech_basic->grid.cells[2]);
-  TensorMap<Tensor<double, 5>> r(r_, 3, 3, mech_basic->grid.cells[0], mech_basic->grid.cells[1], mech_basic->grid.cells[2]);
+
+  TensorMap<Tensor<double, 5>> F(&F_ptr[0][0][0], 3, 3, mech_basic->grid.cells[0], mech_basic->grid.cells[1], mech_basic->grid.cells2);
+  TensorMap<Tensor<double, 5>> r(&r_ptr[0][0][0], 3, 3, mech_basic->grid.cells[0], mech_basic->grid.cells[1], mech_basic->grid.cells2);
 
   int n_funcs, petsc_iter;
   SNESGetNumberFunctionEvals(mech_basic->SNES_mechanical, &n_funcs);

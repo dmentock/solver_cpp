@@ -12,7 +12,7 @@ public:
   MechSolverBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
       : MechBase(config_, grid_, spectral_) {}
   void init() override;
-  static PetscErrorCode formResidual(DMDALocalInfo* residual_subdomain, void* F_raw, void* r_raw, void *ctx);
+  static PetscErrorCode form_residual(DMDALocalInfo* residual_subdomain, double*** F_ptr, double*** r_ptr, void *ctx);
   static PetscErrorCode converged(SNES snes_local, 
                                   PetscInt PETScIter, 
                                   PetscReal devNull1, 
@@ -20,7 +20,7 @@ public:
                                   PetscReal fnorm, 
                                   SNESConvergedReason *reason, 
                                   void *ctx);
-  Spectral::SolutionState calculate_solution(std::string inc_info_) override;
+  Config::SolutionState calculate_solution(std::string& inc_info_) override;
   void forward (bool cutBack, bool guess, double Delta_t, double Delta_t_old, double t_remaining,
                 Config::BoundaryCondition& deformation_BC, 
                 Config::BoundaryCondition& stress_BC, 

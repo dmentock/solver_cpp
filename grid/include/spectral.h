@@ -76,22 +76,9 @@ public:
   unique_ptr<FFT<4>> vectorfield;
   unique_ptr<FFT<5>> tensorfield;
 
-  struct SolutionState {
-    bool converged;
-    int iterationsNeeded;
-    bool terminally_ill;
-  };
 
 private:
   const double TAU = 2 * M_PI;
 };
-
-struct SolutionParams {
-  Eigen::Matrix<double, 3, 3> stress_bc;
-  Eigen::Matrix<bool, 3, 3> stress_mask;
-  Eigen::Quaterniond rot_bc_q;
-  double delta_t;
-};
-
 
 #endif // SPECTRAL_H

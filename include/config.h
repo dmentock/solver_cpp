@@ -68,8 +68,22 @@ public:
     double N;
     int r = 1;
     bool estimate_rate = true;
-    int f_out = 0;
+    int f_out = 1;
     int f_restart = 0;
+  };
+
+  struct SolutionState {
+    int required_iterations = 0;
+    bool converged = true;
+    bool stag_converged = true;
+    bool terminally_ill = false;
+  };
+
+  struct SolutionParams {
+    Eigen::Matrix<double, 3, 3> stress_bc;
+    Eigen::Matrix<bool, 3, 3> stress_mask;
+    Eigen::Quaterniond rot_bc_q;
+    double delta_t;
   };
 
   std::map<std::string, std::string> fields;
