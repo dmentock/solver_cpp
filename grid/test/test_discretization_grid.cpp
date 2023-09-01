@@ -122,6 +122,6 @@ TEST(CoordCalculationSetup, TestCalculateNodes0) {
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
-    ::testing::InitGoogleTest(&argc, argv);
+    ::testing::AddGlobalTestEnvironment(new PetscMpiEnv);
     return RUN_ALL_TESTS();
 }

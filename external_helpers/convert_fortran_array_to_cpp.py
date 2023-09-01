@@ -9,7 +9,7 @@ def format_nested_array(numbers_str, dimensions, cat=False):
     nl = '\n'
     numbers_array = np.array(numbers)
     reshaped_array = np.reshape(numbers_array, dimensions, order='F')
-    max_len = (max([len(f'{i.real:.17g}') for i in np.ravel(numbers_array)]) if not is_complex else \
+    max_len = (max([len(f'{i.real:.17g}') for i in np.ravel(numbers_array)])+1 if not is_complex else \
               max(max(len(f'{i.real:.17g}'), len(f'{i.imag:.17g}')) for i in np.ravel(numbers_array)))
     def format_array(arr, level, max_len, inner_first=False):
         indent = ' '+' '*level
