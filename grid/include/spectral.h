@@ -31,15 +31,14 @@ public:
                                                                   std::array<int, 3> cells, 
                                                                   std::array<double, 3> geom_size, 
                                                                   std::array<int, 3>& k_s);
-  virtual void constitutive_response (TensorMap<Tensor<double, 5>> &P,
-                                      Tensor<double, 2> &P_av, 
-                                      Tensor<double, 4> &C_volAvg, 
-                                      Tensor<double, 4> &C_minMaxAvg,
-                                      TensorMap<Tensor<double, 5>> &F,
-                                      double Delta_t,
-                                      std::optional<Eigen::Quaterniond> rot_bc_q = std::nullopt);   
+  virtual Tensor<double, 5> constitutive_response(Tensor<double, 2> &P_av, 
+                                                  Tensor<double, 4> &C_volAvg, 
+                                                  Tensor<double, 4> &C_minMaxAvg,
+                                                  TensorMap<Tensor<double, 5>> &F,
+                                                  double Delta_t,
+                                                  std::optional<Quaterniond> rot_bc_q = std::nullopt);   
 
-  virtual void homogenization_fetch_tensor_pointers(int n_cells_global) {
+  virtual void homogenization_fetch_tensor_pointers(int n_cells_local) {
     double* homogenization_F0_raw_ptr;
     double* homogenization_F_raw_ptr;
     double* homogenization_P_raw_ptr;
@@ -48,10 +47,10 @@ public:
     f_homogenization_fetch_tensor_pointers (&homogenization_F0_raw_ptr, &homogenization_F_raw_ptr, 
                                             &homogenization_P_raw_ptr, &homogenization_dPdF_raw_ptr,
                                             &raw_terminally_ill_raw_ptr);
-    homogenization_F0 = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F0_raw_ptr, 3, 3, n_cells_global);
-    homogenization_F = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F_raw_ptr, 3, 3, n_cells_global);
-    homogenization_P = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_P_raw_ptr, 3, 3, n_cells_global);
-    homogenization_dPdF = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 5>>>(homogenization_dPdF_raw_ptr, 3, 3, 3, 3, n_cells_global);
+    homogenization_F0 = std::make_unique<TensorMap<Tensor<double, 3>>>(homogenization_F0_raw_ptr, 3, 3, n_cells_local);
+    homogenization_F = std::make_unique<TensorMap<Tensor<double, 3>>>(homogenization_F_raw_ptr, 3, 3, n_cells_local);
+    homogenization_P = std::make_unique<TensorMap<Tensor<double, 3>>>(homogenization_P_raw_ptr, 3, 3, n_cells_local);
+    homogenization_dPdF = std::make_unique<TensorMap<Tensor<double, 5>>>(homogenization_dPdF_raw_ptr, 3, 3, 3, 3, n_cells_local);
     terminally_ill = static_cast<bool*>(raw_terminally_ill_raw_ptr);
   }
 
@@ -61,16 +60,16 @@ public:
                                     std::array<int, 2>& FEsolving_execIP, 
                                     std::array<int, 2>& FEsolving_execElem);
 
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 3>>> homogenization_F0;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 3>>> homogenization_F;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 3>>> homogenization_P;
-  std::unique_ptr<Eigen::TensorMap<Eigen::Tensor<double, 5>>> homogenization_dPdF;
+  std::unique_ptr<TensorMap<Tensor<double, 3>>> homogenization_F0;
+  std::unique_ptr<TensorMap<Tensor<double, 3>>> homogenization_F;
+  std::unique_ptr<TensorMap<Tensor<double, 3>>> homogenization_P;
+  std::unique_ptr<TensorMap<Tensor<double, 5>>> homogenization_dPdF;
   bool* terminally_ill;
 
   double wgt = 0.5;
   
-  Eigen::Tensor<std::complex<double>, 4> xi1st;
-  Eigen::Tensor<std::complex<double>, 4> xi2nd;
+  Tensor<std::complex<double>, 4> xi1st;
+  Tensor<std::complex<double>, 4> xi2nd;
 
   unique_ptr<FFT<3>> scalarfield;
   unique_ptr<FFT<4>> vectorfield;

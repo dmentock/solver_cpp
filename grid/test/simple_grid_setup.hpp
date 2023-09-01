@@ -11,7 +11,6 @@
 
 
 extern "C" {
-  void f_homogenization_init();
   void f_deallocate_resources();
 }
 
@@ -38,6 +37,15 @@ class MockDiscretizedGrid : public DiscretizationGrid {
     scaled_geom_size[0] = cells_[0]; scaled_geom_size[1] = cells_[1]; scaled_geom_size[2] = cells_[2];
     size2 = geom_size[2] * cells2 / cells[2];
     size2Offset = geom_size[2] * cells2_offset / cells[2];
+
+    n_cells_global = cells[0] * cells[1] * cells[2];
+    n_cells_local = cells[0] * cells[1] * cells2;
+    n_nodes_local = (cells[0]+1) * (cells[1]+1) * (cells2+1);
+
+    Tensor<double, 2> ip_coords_(3, n_cells_local);
+    Tensor<double, 2> node_coords_(3, n_nodes_local);
+    ip_coords = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 2>>>(ip_coords_.data(), 3, n_cells_local);
+    node_coords = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 2>>>(node_coords_.data(), 3, n_nodes_local);
   }
 };
 
@@ -46,7 +54,7 @@ protected:
   Config config;
   PetscErrorCode ierr;
 public:
-  void gridSetup_init_discretization(MockDiscretizedGrid& mock_grid) {
+  void gridTestSetup_init_discretization(MockDiscretizedGrid& mock_grid) {
     Eigen::Tensor<int, 1> materialAt(mock_grid.n_cells_global);
     for (size_t i = 0; i < mock_grid.n_cells_global; i++) {
       materialAt[i] = i;
@@ -59,9 +67,22 @@ public:
       (mock_grid.cells[0]+1) * (mock_grid.cells[1]+1) * mock_grid.cells2 : 
       (mock_grid.cells[0]+1) * (mock_grid.cells[1]+1) * (mock_grid.cells2+1);
     mock_grid.discretization_init(materialAt.data(), mock_grid.n_cells_global,
-                        ipCoordinates0.data(), ipCoordinates0.dimension(1),
-                        nodes0.data(), nodes0.dimension(1),
-                        sharedNodesBegin);
+                                  ipCoordinates0.data(), ipCoordinates0.dimension(1),
+                                  nodes0.data(), nodes0.dimension(1),
+                                  sharedNodesBegin);
+  }
+
+  void gridTestSetup_mock_homogenization_tensors(Spectral& spectral, int n_cells_local) {
+    cout << "ww  " << n_cells_local << endl;
+    mock_homogenization_F0.resize(3, 3, n_cells_local);
+    mock_homogenization_F.resize(3, 3, n_cells_local);
+    mock_homogenization_P.resize(3, 3, n_cells_local);
+    mock_homogenization_dPdF.resize(3, 3, 3, 3, n_cells_local);
+    spectral.homogenization_F0 = std::make_unique<TensorMap<Tensor<double, 3>>>(mock_homogenization_F0.data(), 3, 3, n_cells_local);
+    spectral.homogenization_F = std::make_unique<TensorMap<Tensor<double, 3>>>(mock_homogenization_F.data(), 3, 3, n_cells_local);
+    spectral.homogenization_P = std::make_unique<TensorMap<Tensor<double, 3>>>(mock_homogenization_P.data(), 3, 3, n_cells_local);
+    spectral.homogenization_dPdF = std::make_unique<TensorMap<Tensor<double, 5>>>(mock_homogenization_dPdF.data(), 3, 3, 3, 3, n_cells_local);
+    spectral.terminally_ill = static_cast<bool*>(&mock_terminally_ill);
   }
 
   template <int Rank>
@@ -74,6 +95,7 @@ public:
     FFT<Rank>* fft_obj = new FFT<Rank>(mock_grid.cells, mock_grid.cells2, extra_dims, 0, &cells1_fftw, &cells1_offset, &cells2_fftw);
     return fft_obj;
   }
+
   void gridTestSetup_set_up_dm(DM& da, Vec& vec, MockDiscretizedGrid& mock_grid) {
     DMDACreate3d(PETSC_COMM_WORLD, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DM_BOUNDARY_NONE, DMDA_STENCIL_BOX,
                 mock_grid.cells[0], mock_grid.cells[1], mock_grid.cells[2],
@@ -97,10 +119,17 @@ public:
     VecAssemblyBegin(vec);
     VecAssemblyEnd(vec);
   }
+
   void gridTestSetup_set_up_snes(SNES& snes) {
     SNESCreate(PETSC_COMM_WORLD, &snes);
     SNESSetOptionsPrefix(snes, "mechanical_");
   }
+
+  bool mock_terminally_ill = false;
+  Tensor<double, 3> mock_homogenization_F0;
+  Tensor<double, 3> mock_homogenization_F;
+  Tensor<double, 3> mock_homogenization_P;
+  Tensor<double, 5> mock_homogenization_dPdF;
 };
 
 #endif // MOCK_DISCRETIZED_GRID_H

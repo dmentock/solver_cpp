@@ -36,7 +36,7 @@ public:
   virtual void forward (bool cutBack, bool guess, double Delta_t, double Delta_t_old, double t_remaining,
                 Config::BoundaryCondition& deformation_BC, 
                 Config::BoundaryCondition& stress_BC, 
-                Eigen::Quaterniond& rotation_BC) = 0;
+                Quaterniond& rotation_BC) = 0;
   virtual void update_coords() = 0;
 
   // Base interface
@@ -48,9 +48,9 @@ public:
    * @param reshaped_x_n resulting node coordinates.
    * @param reshaped_x_p resulting point/cell center coordinates.
    */
-  virtual void base_update_coords(TensorMap<Tensor<double, 5>>& F, 
-                                  Tensor<double, 2>& x_n_, 
-                                  Tensor<double, 2>& x_p_);
+  virtual void base_update_coords(TensorMap<Tensor<double, 5>>& F,
+                                  Tensor<double, 4>& x_n,
+                                  Tensor<double, 4>& x_p);
   /**
    * Calculate coordinates in current configuration for given defgrad field using integration in Fourier space.
    * @param C input stiffness to store as reference stiffness.
@@ -61,44 +61,44 @@ public:
                                           Tensor<double, 5> &rate, 
                                           Matrix<double, 3, 3>* aim = nullptr);
   virtual Tensor<double, 4> calculate_masked_compliance(Tensor<double, 4> &C,
-                                                        Eigen::Quaterniond &rot_bc_q,
+                                                        Quaterniond &rot_bc_q,
                                                         Matrix<bool, 3, 3> &mask_stress);
   virtual double calculate_divergence_rms(const Tensor<double, 5>& tensor_field);
   virtual void gamma_convolution (TensorMap<Tensor<double, 5>> &field, 
                                   Tensor<double, 2> &field_aim);
-  virtual Eigen::Tensor<double, 5> calculate_rate(bool heterogeneous, 
-                                                  const Eigen::Tensor<double, 5>& field0, 
-                                                  const Eigen::Tensor<double, 5>& field, 
+  virtual Tensor<double, 5> calculate_rate(bool heterogeneous, 
+                                                  const Tensor<double, 5>& field0, 
+                                                  const Tensor<double, 5>& field, 
                                                   double dt, 
-                                                  const Eigen::Tensor<double, 2>& avRate);
+                                                  const Tensor<double, 2>& avRate);
 
   Tensor<double, 4> C_ref;
   Tensor<complex<double>, 7> gamma_hat;
 
-  Eigen::Tensor<double, 2> P_av;
-  Eigen::Tensor<double, 2> P_aim;
-  Eigen::Tensor<double, 4> C_volAvg;
-  Eigen::Tensor<double, 4> C_volAvgLastInc;
-  Eigen::Tensor<double, 4> C_minMaxAvg;
-  Eigen::Tensor<double, 4> C_minMaxAvgLastInc;
-  Eigen::Tensor<double, 4> C_minMaxAvgRestart;
+  Tensor<double, 2> P_av;
+  Tensor<double, 2> P_aim;
+  Tensor<double, 4> C_volAvg;
+  Tensor<double, 4> C_volAvgLastInc;
+  Tensor<double, 4> C_minMaxAvg;
+  Tensor<double, 4> C_minMaxAvgLastInc;
+  Tensor<double, 4> C_minMaxAvgRestart;
 
-  Eigen::Tensor<double, 5> F_last_inc;
-  Eigen::Tensor<double, 5> F_dot;
+  Tensor<double, 5> F_last_inc;
+  Tensor<double, 5> F_dot;
 
-  Eigen::Matrix<double, 3, 3> F_aim_dot = Eigen::Matrix<double, 3, 3>::Zero();
-  Eigen::Matrix<double, 3, 3> F_aim = Eigen::Matrix<double, 3, 3>::Identity();
-  Eigen::Matrix<double, 3, 3> F_aim_last_inc = Eigen::Matrix<double, 3, 3>::Identity();
-  // Eigen::Matrix<double, 3, 3> P_av = Eigen::Matrix<double, 3, 3>::Zero();
-  // Eigen::Matrix<double, 3, 3> P_aim = Eigen::Matrix<double, 3, 3>::Zero();
+  Matrix<double, 3, 3> F_aim_dot = Matrix<double, 3, 3>::Zero();
+  Matrix<double, 3, 3> F_aim = Matrix<double, 3, 3>::Identity();
+  Matrix<double, 3, 3> F_aim_last_inc = Matrix<double, 3, 3>::Identity();
+  // Matrix<double, 3, 3> P_av = Matrix<double, 3, 3>::Zero();
+  // Matrix<double, 3, 3> P_aim = Matrix<double, 3, 3>::Zero();
 
   // // 4D tensor of real numbers
-  // Eigen::Tensor<double, 4> C_volAvg = Eigen::Tensor<double, 4>::Zero(3, 3, 3, 3);
-  // Eigen::Tensor<double, 4> C_volAvgLastInc = Eigen::Tensor<double, 4>::Zero(3, 3, 3, 3);
-  // Eigen::Tensor<double, 4> C_minMaxAvg = Eigen::Tensor<double, 4>::Zero(3, 3, 3, 3);
-  // Eigen::Tensor<double, 4> C_minMaxAvgLastInc = Eigen::Tensor<double, 4>::Zero(3, 3, 3, 3);
-  // Eigen::Tensor<double, 4> C_minMaxAvgRestart = Eigen::Tensor<double, 4>::Zero(3, 3, 3, 3);
-  // Eigen::Tensor<double, 4> S = Eigen::Tensor<double, 4>::Zero(3, 3, 3, 3);
+  // Tensor<double, 4> C_volAvg = Tensor<double, 4>::Zero(3, 3, 3, 3);
+  // Tensor<double, 4> C_volAvgLastInc = Tensor<double, 4>::Zero(3, 3, 3, 3);
+  // Tensor<double, 4> C_minMaxAvg = Tensor<double, 4>::Zero(3, 3, 3, 3);
+  // Tensor<double, 4> C_minMaxAvgLastInc = Tensor<double, 4>::Zero(3, 3, 3, 3);
+  // Tensor<double, 4> C_minMaxAvgRestart = Tensor<double, 4>::Zero(3, 3, 3, 3);
+  // Tensor<double, 4> S = Tensor<double, 4>::Zero(3, 3, 3, 3);
 
   // // Scalar real numbers
   // double err_BC;

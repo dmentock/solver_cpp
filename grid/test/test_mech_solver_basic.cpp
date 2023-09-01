@@ -25,20 +25,14 @@ using Tensor5d = Eigen::Tensor<double, 5>;
 using TensorMap5d = Eigen::TensorMap<Eigen::Tensor<double, 5>>;
 using Matrix33b = Eigen::Matrix<bool, 3, 3>;
 using Matrix33d = Eigen::Matrix<double, 3, 3>;
-using optional_q = std::optional<Eigen::Quaterniond>;
 
 MATCHER_P(TensorEq, other, "") {
   return tensor_eq(arg, other);
 }
-ACTION_P(SetArg0, value) { arg0 = value; }
-ACTION_P(SetArg1, value) { arg1 = value; }
-
 
 class PartialMockSpectral : public Spectral {
   public:
-  PartialMockSpectral(Config& config_, DiscretizationGrid& grid_)
-  : Spectral() {}
-  MOCK_METHOD(void, constitutive_response, (TensorMap5d&, Tensor2d&, Tensor4d&, Tensor4d&, TensorMap5d&, double, optional_q), (override));
+  MOCK_METHOD(Tensor5d, constitutive_response, (Tensor2d&, Tensor4d&, Tensor4d&, TensorMap5d&, double, std::optional<Eigen::Quaterniond>), (override));
 };
 
 TEST_F(GridTestSetup, TestMechSolverBasicInit) {
@@ -47,13 +41,13 @@ TEST_F(GridTestSetup, TestMechSolverBasicInit) {
     PartialMockMechSolverBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
         : MechSolverBasic(config_, grid_, spectral_) {};
     MOCK_METHOD(void, base_init, (), (override));
-    MOCK_METHOD(void, base_update_coords, (TensorMap5d&, Tensor2d&, Tensor2d&), (override));
+    MOCK_METHOD(void, base_update_coords, (TensorMap5d&, Tensor4d&, Tensor4d&), (override));
     MOCK_METHOD(void, update_gamma, (Tensor4d&), (override));
   };
 
   MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
 
-  PartialMockSpectral spectral(config, mock_grid);
+  PartialMockSpectral spectral;
   PartialMockMechSolverBasic mech_basic(config, mock_grid, spectral);
 
   gridTestSetup_set_up_dm(mech_basic.da, mech_basic.solution_vec, mock_grid);
@@ -88,7 +82,7 @@ TEST_F(GridTestSetup, TestMechSolverBasicInit) {
   EXPECT_CALL(mech_basic, base_init());
   EXPECT_CALL(mech_basic, base_update_coords(testing::_, testing::_, testing::_)).WillOnce(testing::DoDefault());
   EXPECT_CALL(mech_basic, update_gamma(testing::_)).WillOnce(testing::DoDefault());
-  EXPECT_CALL(spectral, constitutive_response(testing::_, testing::_, testing::_, testing::_, testing::_, testing::_, testing::_)).WillOnce(testing::DoDefault());
+  EXPECT_CALL(spectral, constitutive_response(testing::_, testing::_, testing::_, testing::_, testing::_, testing::_)).WillOnce(testing::DoDefault());
 
   Eigen::Tensor<double, 3> homogenization_F0_(3, 3, 2);
   spectral.homogenization_F0 = std::make_unique<Eigen::TensorMap<Eigen::Tensor<double, 3>>>(homogenization_F0_.data(), 3, 3, 2);
@@ -101,7 +95,7 @@ TEST_F(GridTestSetup, TestMechSolverBasicInit) {
 
 TEST_F(GridTestSetup, TestConverged) {
   MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
-  PartialMockSpectral spectral(config, mock_grid);
+  PartialMockSpectral spectral;
   MechSolverBasic mech_basic(config, mock_grid, spectral);
   SNESConvergedReason reason;
   void* mech_basic_raw = static_cast<void*>(&mech_basic);
@@ -109,7 +103,7 @@ TEST_F(GridTestSetup, TestConverged) {
   mech_basic.total_iter = 1;
   mech_basic.converged(mech_basic.SNES_mechanical, 4, 0, 0, 0, &reason, mech_basic_raw);
 
-  EXPECT_EQ(reason, 0);
+  EXPECT_EQ(reason, 2); // converged because std::max(mech_basic->err_div / divTol, mech_basic->err_BC / BCTol) < 1.0)
 }
 
 
@@ -129,9 +123,11 @@ TEST_F(GridTestSetup, TestMechSolverBasicSolution) {
     }  
   };
   MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
-  gridSetup_init_discretization(mock_grid);
-  f_homogenization_init();
-  PartialMockSpectral spectral(config, mock_grid);
+  gridTestSetup_init_discretization(mock_grid);
+
+  PartialMockSpectral spectral;
+  gridTestSetup_mock_homogenization_tensors(spectral, mock_grid.n_cells_local);
+
   PartialMockMechSolverBasic mech_basic(config, mock_grid, spectral);
 
   gridTestSetup_set_up_snes(mech_basic.SNES_mechanical);
@@ -169,7 +165,7 @@ public:
 TEST_F(GridTestSetup, TestBasicForward) {
 
   MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
-  PartialMockSpectral spectral(config, mock_grid);
+  PartialMockSpectral spectral;
   PartialMockMechSolverBasicForward mech_basic(config, mock_grid, spectral);
 
   gridTestSetup_set_up_dm(mech_basic.da, mech_basic.solution_vec, mock_grid);
@@ -181,7 +177,7 @@ TEST_F(GridTestSetup, TestBasicForward) {
                            0,    0,    0;
   deformation_bc.mask <<  false, false, false,
                           false, true , false,
-                          false, false, true;
+                          false, false, true; 
 
   Config::BoundaryCondition stress_bc;
   stress_bc.type = "P";
@@ -248,7 +244,7 @@ TEST_F(GridTestSetup, TestFormResidual) {
 
   MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
 
-  PartialMockSpectral spectral(config, mock_grid);
+  PartialMockSpectral spectral;
   PartialMockMechSolverBasic mech_basic(config, mock_grid, spectral);
 
   DM da;
@@ -339,11 +335,9 @@ TEST_F(GridTestSetup, TestFormResidual) {
     {{{  11722169413.974548 }},
      {{  11705689816.819708 }}}}
   });
-  Eigen::TensorMap<Eigen::Tensor<double, 5>> mocked_constitutive_response_P_map(
-    mocked_constitutive_response_P.data(), 3, 3, 2, 1, 1);
   EXPECT_CALL(spectral, constitutive_response
-    (testing::_, testing::_, testing::_, testing::_, testing::_, testing::_, testing::_))
-    .WillOnce(SetArg0(mocked_constitutive_response_P_map));
+    (testing::_, testing::_, testing::_, testing::_, testing::_, testing::_))
+    .WillOnce(testing::Return(mocked_constitutive_response_P));
 
   EXPECT_CALL(mech_basic, calculate_divergence_rms(testing::_)).WillOnce(testing::Return(0));
 
@@ -389,11 +383,11 @@ TEST_F(GridTestSetup, TestMechSolverBasicUpdateCoords) {
   public:
     PartialMockMechSolverBasic(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
         : MechSolverBasic(config_, grid_, spectral_) {};
-    MOCK_METHOD(void, base_update_coords, (TensorMap5d&, Tensor2d&, Tensor2d&), (override));
+    MOCK_METHOD(void, base_update_coords, (TensorMap5d&, Tensor4d&, Tensor4d&), (override));
   };
 
   MockDiscretizedGrid mock_grid(std::array<int, 3>{2,1,1});
-  PartialMockSpectral spectral(config, mock_grid);
+  PartialMockSpectral spectral;
   PartialMockMechSolverBasic mech_basic(config, mock_grid, spectral);
 
   gridTestSetup_set_up_dm(mech_basic.da, mech_basic.solution_vec, mock_grid);

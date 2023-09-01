@@ -24,7 +24,7 @@ public:
   void forward (bool cutBack, bool guess, double Delta_t, double Delta_t_old, double t_remaining,
                 Config::BoundaryCondition& deformation_BC, 
                 Config::BoundaryCondition& stress_BC, 
-                Eigen::Quaterniond& rotation_BC) override;
+                Quaterniond& rotation_BC) override;
   void update_coords() override;
 };
 #endif // MECH_BASIC_H

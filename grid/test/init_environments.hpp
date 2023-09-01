@@ -1,5 +1,8 @@
 #include <gtest/gtest.h>
+
 #include <petsc.h>
+#include <petscsys.h>
+
 
 class PetscMpiEnv : public ::testing::Environment {
 protected:

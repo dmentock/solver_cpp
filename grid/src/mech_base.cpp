@@ -47,7 +47,7 @@ void MechBase::base_init(){
   }
 }
 
-void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double, 2>& x_n_, Tensor<double, 2>& x_p_) {
+void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double, 4>& x_n, Tensor<double, 4>& x_p) {
   Eigen::Tensor<std::complex<double>, 5> tensorfield_fourier = spectral.tensorfield->forward(F);
   // Average F
   Tensor<double, 2> Favg(3, 3);
@@ -121,9 +121,9 @@ void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double
   Eigen::array<Eigen::IndexPair<int>, 1> product_dims = {Eigen::IndexPair<int>(1, 0)};
   Eigen::Array<double, 3, 1> step(grid.geom_size[0] / grid.cells[0], grid.geom_size[1] / grid.cells[1], grid.geom_size[2] / grid.cells[2]);
 
-  x_n_.setZero();
-  TensorMap<Tensor<double, 4>> x_n(x_n_.data(), 
-      Eigen::array<Eigen::Index, 4>({3, grid.cells[0] + 1, grid.cells[1] + 1, grid.cells2 + 1}));
+  *spectral.homogenization_F0 = F_last_inc.reshape(Eigen::DSizes<Eigen::DenseIndex, 3>(3, 3, grid.cells[0]*grid.cells[1]*grid.cells2));
+
+  x_n.setZero();
   for (int j = 0; j <= grid.cells[1]; j++) {
     for (int k = 0; k <= grid.cells2; k++) {
       for (int i = 0; i <= grid.cells[0]; i++) {
@@ -145,8 +145,6 @@ void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double
   }
 
   // Calculate cell center/point positions
-  TensorMap<Tensor<double, 4>> x_p(x_p_.data(), 
-      Eigen::array<Eigen::Index, 4>({3, grid.cells[0], grid.cells[1], grid.cells2}));
   for (int k = 0; k < grid.cells2; ++k) {
     for (int j = 0; j < grid.cells[1]; ++j) {
       for (int i = 0; i < grid.cells[0]; ++i) {
@@ -162,7 +160,11 @@ void MechBase::base_update_coords(TensorMap<Tensor<double, 5>>& F, Tensor<double
 }
 
 void MechBase::update_gamma(Tensor<double, 4> &C) {
+  // cout << "cECE" << C << endl;
+  // cout << "cECE" << C_ref << endl;
   C_ref = C / spectral.wgt;
+  // cout << "cECE" << C_ref << endl;
+
   if (!config.numerics.memory_efficient){
     gamma_hat.setConstant(complex<double>(0.0, 0.0));
     for (int j = grid.cells1_offset_tensor; j < grid.cells1_offset_tensor + grid.cells1_tensor; ++j) {

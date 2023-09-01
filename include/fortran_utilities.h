@@ -22,9 +22,9 @@ class FortranUtilities {
     int size_reduced = input.rows(); // assuming the matrix is square
     f_math_invert(output.data(), &errmatinv, input.data(), &size_reduced);
     if (errmatinv) {
-      std::cerr << "Matrix inversion error: " << std::endl;
-      std::cerr << input << std::endl;
-      exit(1);
+      std::stringstream ss;
+      ss << input;
+      throw std::runtime_error("Matrix inversion error:\n" + ss.str());
     }
   }
 

@@ -18,6 +18,7 @@ target_link_libraries(test_cpp_fortran_interface
 add_executable(test_discretization_grid test_discretization_grid.cpp)
 target_link_libraries(test_discretization_grid 
                       discretization_grid 
+                      ${PETSC_ARCH_DIR}/lib/libpetsc.so
                       GTest::GTest 
                       GTest::Main 
                       gmock gmock_main)

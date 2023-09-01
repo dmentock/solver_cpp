@@ -77,31 +77,24 @@ void MechSolverBasic::init() {
 
   double* F_raw;
   ierr = VecGetArray(solution_vec, &F_raw);
-
-
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
   TensorMap<Tensor<double, 5>> F(F_raw,  3, 3, grid.cells[0], grid.cells[1], grid.cells2);
-
   std::memcpy(F.data(), F_last_inc.data(), sizeof(double) * F.size());
   *spectral.homogenization_F0 = F_last_inc.reshape(Eigen::DSizes<Eigen::DenseIndex, 3>(3, 3, grid.cells[0]*grid.cells[1]*grid.cells2));
-  Tensor<double, 2> x_n(3, 12);
-  Tensor<double, 2> x_p(3, 12);
 
+  Tensor<double, 4> x_n(3, grid.cells[0]+1, grid.cells[1]+1, grid.cells2+1);
+  Tensor<double, 4> x_p(3, grid.cells[0], grid.cells[1], grid.cells2);
   base_update_coords(F, x_n, x_p); // fix after implementing restart
 
   Tensor<double, 5> P(3, 3, grid.cells[0], grid.cells[1], grid.cells[2]);
-  TensorMap<Tensor<double, 5>> P_map(P.data(), 3, 3, grid.cells[0], grid.cells[1], grid.cells2);
   P_av.resize(3, 3);
   C_volAvg.resize(3, 3, 3, 3);
   C_minMaxAvg.resize(3, 3, 3, 3);
-
-  spectral.constitutive_response (P_map,
-                                  P_av,
-                                  C_volAvg,
-                                  C_minMaxAvg,
-                                  F,
-                                  0);
-
+  P = spectral.constitutive_response(P_av,
+                                     C_volAvg,
+                                     C_minMaxAvg,
+                                     F,
+                                     0);
   // add restart calls 253-268
   update_gamma(C_minMaxAvg);
   C_minMaxAvgRestart = C_minMaxAvg;
@@ -188,17 +181,20 @@ void MechSolverBasic::forward(bool cutBack, bool guess, double delta_t, double d
   params.stress_mask = stress_bc.mask;
   params.rot_bc_q = rot_bc_q;
   params.delta_t = delta_t;
-}
+} 
 
 void MechSolverBasic::update_coords() {
   PetscScalar *F_raw;
   ierr = VecGetArray(solution_vec, &F_raw); 
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
+  
   TensorMap<Tensor<double, 5>> F(reinterpret_cast<double*>(F_raw), 3, 3, grid.cells[0], grid.cells[1], grid.cells2);
-
-  Tensor<double, 2> x_n;
-  Tensor<double, 2> x_p;
+  Tensor<double, 4> x_n(3, grid.cells[0]+1, grid.cells[1]+1, grid.cells2+1);
+  Tensor<double, 4> x_p(3, grid.cells[0], grid.cells[1], grid.cells2);
   base_update_coords(F, x_n, x_p);
+
+  *grid.ip_coords = x_p.reshape(Eigen::array<Eigen::Index, 2>({3, grid.n_cells_local}));;
+  *grid.node_coords = x_n.reshape(Eigen::array<Eigen::Index, 2>({3, grid.n_nodes_local}));;
   ierr = VecRestoreArray(solution_vec, &F_raw);
   CHKERRABORT(PETSC_COMM_WORLD, ierr);
 }
@@ -215,9 +211,13 @@ PetscErrorCode MechSolverBasic::converged(SNES snes_local,
 
   double divTol = std::max(mech_basic->err_div * mech_basic->config.numerics.eps_div_rtol, mech_basic->config.numerics.eps_div_atol);
   double BCTol = std::max(mech_basic->err_BC * mech_basic->config.numerics.eps_stress_rtol, mech_basic->config.numerics.eps_stress_atol);
-
-  if ((mech_basic->total_iter >= mech_basic->config.numerics.itmin && std::max(mech_basic->err_div / divTol, mech_basic->err_BC / BCTol) < 1.0) || mech_basic->spectral.terminally_ill) {
-    *reason = SNES_CONVERGED_ITERATING;
+  cout << "ww " << mech_basic->total_iter << " " << mech_basic->config.numerics.itmin << endl;
+  cout << "ww " << mech_basic->err_div / divTol << " " << mech_basic->err_BC / BCTol << endl;
+  cout << "ww " << std::max(mech_basic->err_div / divTol, mech_basic->err_BC / BCTol) << endl;
+  cout << "ww " << mech_basic->spectral.terminally_ill << endl;
+  if ((mech_basic->total_iter >= mech_basic->config.numerics.itmin && std::max(mech_basic->err_div / divTol, mech_basic->err_BC / BCTol) < 1.0) || 
+       mech_basic->spectral.terminally_ill) {
+    *reason = SNES_CONVERGED_FNORM_ABS;
   } else if (mech_basic->total_iter >= mech_basic->config.numerics.itmax) {
     *reason = SNES_DIVERGED_MAX_IT;
   } else {
@@ -230,7 +230,6 @@ PetscErrorCode MechSolverBasic::converged(SNES snes_local,
   std::cout << "error stress BC  = " << mech_basic->err_BC / BCTol << " (" << mech_basic->err_BC << " Pa,  tol = " << BCTol << ")" << std::endl;
   std::cout << "\n===========================================================================" << std::endl;
 
-  exit(10);
   return 0;
 }
 
@@ -260,7 +259,7 @@ PetscErrorCode MechSolverBasic::form_residual(DMDALocalInfo* residual_subdomain,
     std::cout.flush();
   }
 
-  mech_basic->spectral.constitutive_response(r, mech_basic->P_av, mech_basic->C_volAvg, mech_basic->C_minMaxAvg, F, mech_basic->params.delta_t, mech_basic->params.rot_bc_q);
+  r = mech_basic->spectral.constitutive_response(mech_basic->P_av, mech_basic->C_volAvg, mech_basic->C_minMaxAvg, F, mech_basic->params.delta_t, mech_basic->params.rot_bc_q);
   MPI_Allreduce(MPI_IN_PLACE, mech_basic->spectral.terminally_ill, 1, MPI_INTEGER, MPI_LOR, MPI_COMM_WORLD);
   mech_basic->err_div = mech_basic->calculate_divergence_rms(r);
   Matrix<double, 3, 3> delta_F_aim;
@@ -273,5 +272,7 @@ PetscErrorCode MechSolverBasic::form_residual(DMDALocalInfo* residual_subdomain,
   mech_basic->err_BC = err_BC_(0);  
   Tensor<double, 2>  rotated = FortranUtilities::rotate_tensor2(mech_basic->params.rot_bc_q, delta_F_aim, true);
   mech_basic->gamma_convolution(r, rotated);
+
+  print_f_map("r", r);
   return 0;
 }

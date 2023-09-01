@@ -18,9 +18,9 @@
 /*!
   Implements all undefined virtual functions to allow for instantiation and testing of base functionalities.
 */
-class MechBaseTest : public MechBase {
+class PartialMockMechBase : public MechBase {
 public:
-  MechBaseTest(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
+  PartialMockMechBase(Config& config_, DiscretizationGrid& grid_, Spectral& spectral_)
       : MechBase(config_, grid_, spectral_) {}
 
   virtual void init() {}
@@ -28,7 +28,7 @@ public:
   virtual void forward (bool cutBack, bool guess, double Delta_t, double Delta_t_old, double t_remaining,
                 Config::BoundaryCondition& deformation_BC, 
                 Config::BoundaryCondition& stress_BC, 
-                Eigen::Quaterniond& rotation_BC) {}
+                Quaterniond& rotation_BC) {}
   virtual void update_coords() {}
 };
 
@@ -37,17 +37,17 @@ TEST_F(GridTestSetup, MechBaseTestInit) {
 
   Spectral spectral;
   Config config;
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
 
   config.numerics.memory_efficient = 0;
-  Eigen::DSizes<Eigen::DenseIndex, 7> expected_gamma_hat_dims(3, 3, 3, 3, 2, 1, 1);
-  mech_utilities.base_init();
-  ASSERT_EQ(mech_utilities.gamma_hat.dimensions(), expected_gamma_hat_dims);
+  DSizes<DenseIndex, 7> expected_gamma_hat_dims(3, 3, 3, 3, 2, 1, 1);
+  mech_base.base_init();
+  ASSERT_EQ(mech_base.gamma_hat.dimensions(), expected_gamma_hat_dims);
 
   config.numerics.memory_efficient = 1;
-  Eigen::DSizes<Eigen::DenseIndex, 7> expected_gamma_hat_dims_mem_eff(3, 3, 3, 3, 1, 1, 1);
-  mech_utilities.base_init();
-  ASSERT_EQ(mech_utilities.gamma_hat.dimensions(), expected_gamma_hat_dims_mem_eff);
+  DSizes<DenseIndex, 7> expected_gamma_hat_dims_mem_eff(3, 3, 3, 3, 1, 1, 1);
+  mech_base.base_init();
+  ASSERT_EQ(mech_base.gamma_hat.dimensions(), expected_gamma_hat_dims_mem_eff);
 
   // TODO: mock calls to set_up_fftw template function
 }
@@ -59,19 +59,19 @@ TEST_F(GridTestSetup,MechBaseTestInitDivergenceCorrection) {
   Config config;
   mock_grid.geom_size = std::array<double, 3>{3,4,5};
 
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
 
   config.numerics.divergence_correction = 0;
-  mech_utilities.base_init();
+  mech_base.base_init();
   ASSERT_EQ(mock_grid.scaled_geom_size, mock_grid.geom_size);
 
   config.numerics.divergence_correction = 1;
-  mech_utilities.base_init();
+  mech_base.base_init();
   std::array<double, 3>expected_scaled_geom_size_1({0.75, 1, 1.25});
   ASSERT_EQ(mock_grid.scaled_geom_size, expected_scaled_geom_size_1);
 
   config.numerics.divergence_correction = 2;
-  mech_utilities.base_init();
+  mech_base.base_init();
   std::array<double, 3>expected_scaled_geom_size_2({0.6, 0.8, 1 });
   ASSERT_EQ(mock_grid.scaled_geom_size, expected_scaled_geom_size_2);
 }
@@ -83,8 +83,10 @@ TEST_F(GridTestSetup, MechBaseTestUpdateCoords) {
   spectral.wgt = 0.5;
   spectral.tensorfield.reset(gridTestSetup_init_fft<5>(mock_grid));
   spectral.vectorfield.reset(gridTestSetup_init_fft<4>(mock_grid));
+  gridTestSetup_mock_homogenization_tensors(spectral, mock_grid.n_cells_local);
 
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
+
 
   spectral.xi2nd.resize(3, 2, 1, 1);
   spectral.xi2nd.setValues({
@@ -104,26 +106,48 @@ TEST_F(GridTestSetup, MechBaseTestUpdateCoords) {
   });
   TensorMap<Tensor<double, 5>> F(F_.data(), 3, 3, 2, 1, 1);
 
-  Eigen::Tensor<double, 2> x_n(3, 12);
+  Eigen::Tensor<double, 4> expected_x_n(3, 3, 2, 2);
+  expected_x_n.setValues({
+   {{{  0                     ,  0                      },
+     {  0                     ,  0                      }},
+    {{  1.0000000000000001e-05,  1.0000000000000001e-05 },
+     {  1.0000000000000001e-05,  1.0000000000000001e-05 }},
+    {{  2.0000000000000002e-05,  2.0000000000000002e-05 },
+     {  2.0000000000000002e-05,  2.0000000000000002e-05 }}},
+   {{{  0                     ,  0                      },
+     {  1.0000000000000001e-05,  1.0000000000000001e-05 }},
+    {{  0                     ,  0                      },
+     {  1.0000000000000001e-05,  1.0000000000000001e-05 }},
+    {{  0                     ,  0                      },
+     {  1.0000000000000001e-05,  1.0000000000000001e-05 }}},
+   {{{  0                     ,  1.0000000000000001e-05 },
+     {  0                     ,  1.0000000000000001e-05 }},
+    {{  0                     ,  1.0000000000000001e-05 },
+     {  0                     ,  1.0000000000000001e-05 }},
+    {{  0                     ,  1.0000000000000001e-05 },
+     {  0                     ,  1.0000000000000001e-05 }}}
+  });
+
+  Eigen::Tensor<double, 4> expected_x_p(3, 2, 1, 1);
+  expected_x_p.setValues({
+   {{{  5.0000000000000004e-06 }},
+    {{  1.5000000000000002e-05 }}},
+   {{{  5.0000000000000004e-06 }},
+    {{  5.0000000000000004e-06 }}},
+   {{{  5.0000000000000004e-06 }},
+    {{  5.0000000000000004e-06 }}}
+  });
+
+  Tensor<double, 2> x_ay(3, 3);
+  Tensor<double, 3> x_aan(3, 3, 2);
+  // Tensor<double, 5> x_aaan(3, 3, 2,6,6);
+  Tensor<double, 4> x_an(3, 3, 2, 2);
+  Tensor<double, 4> x_n(3, mock_grid.cells[0]+1, mock_grid.cells[1]+1, mock_grid.cells2+1);
   x_n.setZero();
-  Eigen::Tensor<double, 2> x_p(3, 2);
+  Tensor<double, 4> x_p(3, mock_grid.cells[0], mock_grid.cells[1], mock_grid.cells2);
   x_p.setZero();
 
-  Eigen::Tensor<double, 2> expected_x_n(3, 12);
-  expected_x_n.setValues({
-   {  0   ,  1e-05, 2e-05,  0    ,  1e-05,  2e-05,  0    ,  1e-05,  2e-05,  0    ,  1e-05,  2e-05 },
-   {  0   ,  0   ,  0    ,  1e-05,  1e-05,  1e-05,  0    ,  0    ,  0    ,  1e-05,  1e-05,  1e-05 },
-   {  0   ,  0   ,  0    ,  0    ,  0    ,  0    ,  1e-05,  1e-05,  1e-05,  1e-05,  1e-05,  1e-05 }
-  });
-
-  Eigen::Tensor<double, 2> expected_x_p(3, 2);
-  expected_x_p.setValues({
-   {  5e-06                ,  1.5e-05               },
-   {  5e-06                ,  5e-06                 },
-   {  5e-06                ,  5e-06                 }
-  });
-
-  mech_utilities.base_update_coords(F, x_n, x_p);
+  mech_base.base_update_coords(F, x_n, x_p);
   EXPECT_TRUE(tensor_eq(x_n, expected_x_n));
   EXPECT_TRUE(tensor_eq(x_p, expected_x_p));
 }
@@ -133,9 +157,9 @@ TEST_F(GridTestSetup, TestUpdateGamma) {
   Config config;
   Spectral spectral;
   spectral.wgt = 0.5;
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
   
-  Eigen::Tensor<double, 4> C_min_max_avg(3,3,3,3);
+  Tensor<double, 4> C_min_max_avg(3,3,3,3);
   C_min_max_avg.setValues({
     {
       {{11.11,11.12,11.13},{11.21,11.22,11.23},{11.31,11.32,11.33}},
@@ -164,11 +188,11 @@ TEST_F(GridTestSetup, TestUpdateGamma) {
 
   config.numerics.memory_efficient = 0;
 
-  mech_utilities.gamma_hat.resize(3, 3, 3, 3, 1, 1, 1);
-  Eigen::Tensor<std::complex<double>, 7> expected_gamma_hat(3, 3, 3, 3, 1, 1, 1);
+  mech_base.gamma_hat.resize(3, 3, 3, 3, 1, 1, 1);
+  Tensor<std::complex<double>, 7> expected_gamma_hat(3, 3, 3, 3, 1, 1, 1);
   expected_gamma_hat.setConstant(std::complex<double>(0.0, 0.0));
-  mech_utilities.update_gamma(C_min_max_avg);
-  EXPECT_TRUE(tensor_eq(mech_utilities.gamma_hat, expected_gamma_hat));
+  mech_base.update_gamma(C_min_max_avg);
+  EXPECT_TRUE(tensor_eq(mech_base.gamma_hat, expected_gamma_hat));
   // TODO: add mpi test with initialized instead of mocked discretization
   // TODO: find testcases that cause gamma fluctuation
 }
@@ -178,23 +202,23 @@ TEST_F(GridTestSetup, MechBaseTestForwardField) {
   Config config;
   Spectral spectral;
   spectral.wgt = 0.5;
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
 
-  Eigen::Tensor<double, 5> field_last_inc(3, 3, 2, 1, 1);
+  Tensor<double, 5> field_last_inc(3, 3, 2, 1, 1);
   field_last_inc.setValues({
    {{{{  1  }}, {{  1  }}}, {{{  0  }}, {{  0  }}}, {{{  0  }}, {{  0  }}}},
    {{{{  0  }}, {{  0  }}}, {{{  1  }}, {{  1  }}}, {{{  0  }}, {{  0  }}}},
    {{{{  0  }}, {{  0  }}}, {{{  0  }}, {{  0  }}}, {{{  1  }}, {{  1  }}}}
   });
 
-  Eigen::Tensor<double, 5> rate(3, 3, 2, 1, 1);
+  Tensor<double, 5> rate(3, 3, 2, 1, 1);
   rate.setValues({
    {{{{  0.001 }}, {{  0.001 }}}, {{{  0    }}, {{  0    }}}, {{{  0    }}, {{  0    }}}},
    {{{{  0     }}, {{  0     }}}, {{{  0    }}, {{  0    }}}, {{{  0    }}, {{  0    }}}},
    {{{{  0     }}, {{  0     }}}, {{{  0    }}, {{  0    }}}, {{{  0    }}, {{  0    }}}}
   });
 
-  Eigen::Matrix<double, 3, 3> aim;
+  Matrix<double, 3, 3> aim;
   aim.resize(3,3);
   aim << 1.001,  0   ,  0,
          0    ,  1   ,  0,
@@ -202,14 +226,14 @@ TEST_F(GridTestSetup, MechBaseTestForwardField) {
 
   double delta_t = 1;
 
-  Eigen::Tensor<double, 5> expected_forwarded_field(3, 3, 2, 1, 1);
+  Tensor<double, 5> expected_forwarded_field(3, 3, 2, 1, 1);
   expected_forwarded_field.setValues({
    {{{{  1.001 }}, {{  1.001 }}}, {{{  0    }}, {{  0    }}}, {{{  0    }}, {{  0    }}}},
    {{{{  0     }}, {{  0     }}}, {{{  1    }}, {{  1    }}}, {{{  0    }}, {{  0    }}}},
    {{{{  0     }}, {{  0     }}}, {{{  0    }}, {{  0    }}}, {{{  1    }}, {{  1    }}}}
   });
 
-  EXPECT_TRUE(tensor_eq(mech_utilities.forward_field(delta_t, field_last_inc, rate, &aim), expected_forwarded_field));
+  EXPECT_TRUE(tensor_eq(mech_base.forward_field(delta_t, field_last_inc, rate, &aim), expected_forwarded_field));
 }
 
 TEST_F(GridTestSetup, MechBaseTestMaskedCompliance) {
@@ -217,16 +241,16 @@ TEST_F(GridTestSetup, MechBaseTestMaskedCompliance) {
   Config config;
   Spectral spectral;
   spectral.wgt = 0.5;
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
 
-  Eigen::Quaterniond rot_bc_q(1.0, 0.0, 0.0, 0.0);
+  Quaterniond rot_bc_q(1.0, 0.0, 0.0, 0.0);
 
-  Eigen::Matrix<bool, 3, 3> mask_stress;
+  Matrix<bool, 3, 3> mask_stress;
   mask_stress << true, true, true,
                  true, false, true,
                  true, true, false;
 
-  Eigen::Tensor<double, 4> C;
+  Tensor<double, 4> C;
   C.resize(3, 3, 3, 3);
   C.setValues({
    {{{  76463759461.90884,  151900112.1841662,  322805058.0901647 },
@@ -258,7 +282,7 @@ TEST_F(GridTestSetup, MechBaseTestMaskedCompliance) {
      {  1000692881.711163,  184743304.2786026,  81392648197.50052 }}}
   });
 
-  Eigen::Tensor<double, 4> expected_masked_compliance;
+  Tensor<double, 4> expected_masked_compliance;
   expected_masked_compliance.resize(3, 3, 3, 3);
   expected_masked_compliance.setValues({
    {{{  0                    ,  0                    ,  0                     },
@@ -290,9 +314,9 @@ TEST_F(GridTestSetup, MechBaseTestMaskedCompliance) {
      {  0                    ,  0                    ,  5.813080269043599e-11 }}}
   });
 
-  Eigen::Tensor<double, 4> masked_compliance;
+  Tensor<double, 4> masked_compliance;
   masked_compliance.resize(3, 3, 3, 3);
-  EXPECT_TRUE(tensor_eq(mech_utilities.calculate_masked_compliance(C, rot_bc_q, mask_stress), expected_masked_compliance));
+  EXPECT_TRUE(tensor_eq(mech_base.calculate_masked_compliance(C, rot_bc_q, mask_stress), expected_masked_compliance));
   // TODO: Find more understandable test setup
 }
 
@@ -303,9 +327,9 @@ TEST_F(GridTestSetup, MechBaseTestDivergenceRMS) {
   spectral.tensorfield.reset(gridTestSetup_init_fft<5>(mock_grid));
   spectral.wgt = 0.25;
 
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
 
-  Eigen::Tensor<double, 5> tensor_field(3, 3, 4, 1, 1);
+  Tensor<double, 5> tensor_field(3, 3, 4, 1, 1);
   tensor_field.setValues({
    {{{{  905457362.58214402 }},
      {{  905457362.58214402 }},
@@ -357,7 +381,7 @@ TEST_F(GridTestSetup, MechBaseTestDivergenceRMS) {
     {{ c( 0                ,  0                 ) }}}
   });
 
-  double rms = mech_utilities.calculate_divergence_rms(tensor_field);
+  double rms = mech_base.calculate_divergence_rms(tensor_field);
   ASSERT_EQ(rms, 1481.2323577332318);
   // TODO: Add test for diverging
 }
@@ -368,9 +392,9 @@ TEST_F(GridTestSetup, MechBaseTestGammaConvolution) {
   Spectral spectral;
   spectral.tensorfield.reset(gridTestSetup_init_fft<5>(mock_grid));
   Config config;
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
 
-  Eigen::Tensor<double, 5> field(3, 3, 2, 1, 1);
+  Tensor<double, 5> field(3, 3, 2, 1, 1);
   field.setValues({
    {{{{  9235641.189939182  }}, {{  9632014.409984397  }}},
     {{{ -228992.9056867184  }}, {{ -137151.7288854052  }}},
@@ -383,7 +407,7 @@ TEST_F(GridTestSetup, MechBaseTestGammaConvolution) {
     {{{  15980056.25126295  }}, {{  15457099.20758347  }}}}
   });
 
-  Eigen::Tensor<double, 2> field_aim(3, 3);
+  Tensor<double, 2> field_aim(3, 3);
   field_aim.setValues({
    {  3.577335445476857e-05,  0                    ,  0                     },
    {  0                    ,  3.972872444401787e-05,  0                     },
@@ -400,8 +424,8 @@ TEST_F(GridTestSetup, MechBaseTestGammaConvolution) {
     {{ c( 0 ,  0 ) }}}
   });
 
-  mech_utilities.C_ref.resize(3, 3, 3, 3);
-  mech_utilities.C_ref.setValues({
+  mech_base.C_ref.resize(3, 3, 3, 3);
+  mech_base.C_ref.setValues({
    {{{  319815338338.5793 , -3194055848.940187 ,  1346207996.27981   },
      { -3194055848.940189 ,  186937492844.2772 , -1336138385.28222   },
      {  1346207996.279819 , -1336138385.282229 ,  188667122643.1543  }},
@@ -431,7 +455,7 @@ TEST_F(GridTestSetup, MechBaseTestGammaConvolution) {
      {  1126224014.530421 ,  258877863.5469708 ,  314324404356.3469  }}}
   });
 
-  Eigen::Tensor<double, 5> expected_gamma_field(3, 3, 2, 1, 1);
+  Tensor<double, 5> expected_gamma_field(3, 3, 2, 1, 1);
   expected_gamma_field.setValues({
    {{{{  3.577335445476857e-05 }},
      {{  3.577335445476857e-05 }}},
@@ -453,20 +477,20 @@ TEST_F(GridTestSetup, MechBaseTestGammaConvolution) {
      {{  0                     }}}}
   });
 
-  mech_utilities.gamma_hat.resize(3,3,3,3,mock_grid.cells0_reduced,mock_grid.cells[2],mock_grid.cells1_tensor);
-  mech_utilities.gamma_hat.setZero();
+  mech_base.gamma_hat.resize(3,3,3,3,mock_grid.cells0_reduced,mock_grid.cells[2],mock_grid.cells1_tensor);
+  mech_base.gamma_hat.setZero();
 
   Tensor<double, 5> field_(3, 3, 2, 1, 1);
   TensorMap<Tensor<double, 5>> field_map(field_.data(), 3, 3, 2, 1, 1);
 
   config.numerics.memory_efficient = 0;
   field_ = field;
-  mech_utilities.gamma_convolution(field_map, field_aim);
+  mech_base.gamma_convolution(field_map, field_aim);
   EXPECT_TRUE(tensor_eq(field_, expected_gamma_field));
 
   config.numerics.memory_efficient = 1;
   field_ = field;
-  mech_utilities.gamma_convolution(field_map, field_aim);
+  mech_base.gamma_convolution(field_map, field_aim);
   EXPECT_TRUE(tensor_eq(field_, expected_gamma_field));
   // TODO: for memory_efficient=1, add test where det of A is large enough to enter if branch 
 }
@@ -475,9 +499,9 @@ TEST_F(GridTestSetup, TestCalculateRate) {
   MockDiscretizedGrid mock_grid(std::array<int, 3>{4,1,1}); // use larger grid to enter if branch
   Spectral spectral;
   Config config;
-  MechBaseTest mech_utilities(config, mock_grid, spectral);
+  PartialMockMechBase mech_base(config, mock_grid, spectral);
 
-  Eigen::Tensor<double, 5> field(3, 3, 2, 1, 1);
+  Tensor<double, 5> field(3, 3, 2, 1, 1);
   field.setValues({
    {{{{  1.9018000000000006  }}, {{  1.9018000000000006 }}},
     {{{  0                   }}, {{  0                  }}},
@@ -490,7 +514,7 @@ TEST_F(GridTestSetup, TestCalculateRate) {
     {{{  0.72738794835427367 }}, {{  0.72738794835427367 }}}}
   });
 
-  Eigen::Tensor<double, 5> field_0(3, 3, 2, 1, 1);
+  Tensor<double, 5> field_0(3, 3, 2, 1, 1);
   field_0.setValues({
    {{{{  1.8016000000000005  }}, {{  1.8016000000000005 }}},
     {{{  0                   }}, {{  0                  }}},
@@ -503,14 +527,14 @@ TEST_F(GridTestSetup, TestCalculateRate) {
     {{{  0.74739959105387255 }}, {{  0.74739959105387255 }}}}
   });
 
-  Eigen::Tensor<double, 2> avRate(3, 3);
+  Tensor<double, 2> avRate(3, 3);
   avRate.setValues({
    {  0.001                 ,  0                     ,  0                      },
    {  0                     , -0.00019970504487912415,  0                      },
    {  0                     ,  0                     , -0.00019970428356159926 }
   });
 
-  Eigen::Tensor<double, 5> expected_rate(3, 3, 2, 1, 1);
+  Tensor<double, 5> expected_rate(3, 3, 2, 1, 1);
   expected_rate.setValues({
    {{{{  0.0010000000000000007  }}, {{  0.0010000000000000007  }}},
     {{{  0                      }}, {{  0                      }}},
@@ -523,7 +547,7 @@ TEST_F(GridTestSetup, TestCalculateRate) {
     {{{ -0.00019971699300996881 }}, {{ -0.00019971699300996881 }}}}
   });
 
-  EXPECT_TRUE(tensor_eq(mech_utilities.calculate_rate(true, field_0, field, 100.2, avRate), expected_rate));
+  EXPECT_TRUE(tensor_eq(mech_base.calculate_rate(true, field_0, field, 100.2, avRate), expected_rate));
 }
 
 int main(int argc, char **argv) {

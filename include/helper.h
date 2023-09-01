@@ -121,6 +121,20 @@ void print_f(const std::string& label, const Eigen::Tensor<T, Rank>& tensor) {
     }
 }
 
+template <typename T, int Rank>
+void print_fp(const std::string& label, const Eigen::Tensor<T, Rank>& tensor) {
+  std::cout << label << "  ";
+  for (int i = 0; i < tensor.dimensions().size(); ++i) {
+    std::cout << tensor.dimensions()[i] << "        ";
+  }
+  std::cout << "vals:    ";
+  for (int linear_idx = 0; linear_idx < tensor.size(); ++linear_idx) {
+    std::cout << std::setprecision(17) << tensor.coeff(linear_idx) << "        ";
+  }
+  std::cout << std::endl;
+} 
+
+
 template <typename T, int N>
 void print_f_map(const std::string& label, const Eigen::TensorMap<Eigen::Tensor<T, N>>& tensor_map) {
   Eigen::Tensor<T, N> tensor = tensor_map;

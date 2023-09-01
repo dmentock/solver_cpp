@@ -82,7 +82,7 @@ void Spectral::init(int spectral_derivative_id, DiscretizationGrid& grid){
       }
     }
   }
-  homogenization_fetch_tensor_pointers(grid.n_cells_global); // initialize homogenization array pointers to point to the fortran definitions
+  homogenization_fetch_tensor_pointers(grid.n_cells_local); // initialize homogenization array pointers to point to the fortran definitions
 }
 
 std::array<std::complex<double>, 3> Spectral::get_freq_derivative(int spectral_derivative_id, 
@@ -119,15 +119,15 @@ std::array<std::complex<double>, 3> Spectral::get_freq_derivative(int spectral_d
   return freq_derivative;
 }
 
-void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P, 
-                                      Tensor<double, 2> &P_av, 
-                                      Tensor<double, 4> &C_volAvg, 
-                                      Tensor<double, 4> &C_minMaxAvg,
-                                      TensorMap<Tensor<double, 5>> &F,
-                                      double Delta_t,
-                                      std::optional<Eigen::Quaterniond> rot_bc_q) {
+Tensor<double, 5> Spectral::constitutive_response(Tensor<double, 2> &P_av, 
+                                                  Tensor<double, 4> &C_volAvg, 
+                                                  Tensor<double, 4> &C_minMaxAvg,
+                                                  TensorMap<Tensor<double, 5>> &F,
+                                                  double Delta_t,
+                                                  std::optional<Eigen::Quaterniond> rot_bc_q) {
 
-  int n_cells = P.dimension(2) * P.dimension(3) * P.dimension(4);
+  
+  int n_cells = F.dimension(2) * F.dimension(3) * F.dimension(4);
   Tensor<double, 3> homogenization_F(3, 3, n_cells);
   homogenization_F = F.reshape(Eigen::array<int, 3>({3, 3, n_cells}));
 
@@ -142,7 +142,7 @@ void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P,
     mechanical_response2(Delta_t, FEsolving_execIP, FEsolving_execElem);
   }
 
-  P = homogenization_P->reshape(F.dimensions());
+  Eigen::Tensor<double, 5> P = homogenization_P->reshape(F.dimensions());
   Eigen::array<Eigen::Index, 3> dims_to_reduce = {2, 3, 4};
   P_av = (P.sum(dims_to_reduce) * wgt).eval();  
   MPI_Allreduce(MPI_IN_PLACE, P_av.data(), 9, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
@@ -192,6 +192,8 @@ void Spectral::constitutive_response (TensorMap<Tensor<double, 5>> &P,
   
   MPI::COMM_WORLD.Allreduce(MPI_IN_PLACE, C_volAvg.data(), 81, MPI::DOUBLE, MPI::SUM);
   C_volAvg = C_volAvg * wgt;
+
+  return P;
 }
 
 
