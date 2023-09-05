@@ -34,14 +34,18 @@ class FortranUtilities {
     // int 0 is equivalent to fortran logical false, int -1 is equivalent to true
     int active_ = active? -1 : 0;
     Eigen::Tensor<double, 2> rotated(3, 3);
-    f_rotate_tensor2(rot_input.coeffs().data(), rotation.data(), rotated.data(), &active_);
+    // default eigen quaternion representation in memory is x,y,z,w -> convert to fortran representation 
+    Eigen::Vector4d quaternion_f(rot_input.w(), rot_input.x(), rot_input.y(), rot_input.z());
+
+    f_rotate_tensor2(quaternion_f.data(), rotation.data(), rotated.data(), &active_);
     return rotated;
   }
 
   static Eigen::Tensor<double, 4> rotate_tensor4(Eigen::Quaterniond& rot_input, Eigen::Tensor<double, 4>& rotation, bool active = false) {
     int active_ = active? -1 : 0;
     Eigen::Tensor<double, 4> rotated(3, 3, 3, 3);
-    f_rotate_tensor4(rot_input.coeffs().data(), rotation.data(), rotated.data(), &active_);
+    Eigen::Vector4d quaternion_f(rot_input.w(), rot_input.x(), rot_input.y(), rot_input.z());
+    f_rotate_tensor4(quaternion_f.data(), rotation.data(), rotated.data(), &active_);
     return rotated;
   }
 };
