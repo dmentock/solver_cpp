@@ -141,21 +141,17 @@ Tensor<double, 5> Spectral::constitutive_response(Tensor<double, 2> &P_av,
     std::array<int, 2> FEsolving_execElem = {1, n_cells};
     mechanical_response2(Delta_t, FEsolving_execIP, FEsolving_execElem);
   }
-
   Eigen::Tensor<double, 5> P = homogenization_P->reshape(F.dimensions());
   Eigen::array<Eigen::Index, 3> dims_to_reduce = {2, 3, 4};
-  P_av = (P.sum(dims_to_reduce) * wgt).eval();  
+  P_av = (P.sum(dims_to_reduce) * wgt).eval();
   MPI_Allreduce(MPI_IN_PLACE, P_av.data(), 9, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
-
-
-  Eigen::array<int, 2> P_transpose_dims = {1, 0};
   if (rot_bc_q.has_value()) {
     if (!rot_bc_q.value().isApprox(Eigen::Quaterniond(1.0, 0.0, 0.0, 0.0))) {
-      std::cout << "Piola--Kirchhoff stress (lab) / MPa = " << P_av.shuffle(P_transpose_dims) * 1.e-6 << std::endl;
+      std::cout << "Piola--Kirchhoff stress (lab) / MPaa =\n" << P_av * 1.e-6 << std::endl;
     }
     P_av = FortranUtilities::rotate_tensor2(rot_bc_q.value(), P_av);
   }
-  std::cout << "Piola--Kirchhoff stress       / MPa = " << P_av.shuffle(P_transpose_dims) * 1e-6 << std::endl;
+  std::cout << "Piola--Kirchhoff stress       / MPa =\n" << P_av * 1.e-6 << std::endl;
 
   Eigen::Tensor<double, 4> dPdF_max(3, 3, 3, 3);
   dPdF_max.setZero();
@@ -178,19 +174,20 @@ Tensor<double, 5> Spectral::constitutive_response(Tensor<double, 2> &P_av,
   }
 
   std::array<double, 2> valueAndRank = {dPdF_norm_max, static_cast<double>(MPI::COMM_WORLD.Get_rank())};
-  MPI::COMM_WORLD.Allreduce(MPI_IN_PLACE, valueAndRank.data(), 1, MPI::DOUBLE_INT, MPI::MAXLOC);
+
+  MPI_Allreduce(MPI_IN_PLACE, valueAndRank.data(), 1, MPI_DOUBLE, MPI_MAXLOC, MPI_COMM_WORLD);
   int broadcast_rank = static_cast<int>(valueAndRank[1]);
-  MPI::COMM_WORLD.Bcast(dPdF_max.data(), 81, MPI::DOUBLE, broadcast_rank);
+  MPI_Bcast(dPdF_max.data(), 81, MPI_DOUBLE, broadcast_rank, MPI_COMM_WORLD);
 
   valueAndRank = {dPdF_norm_min, static_cast<double>(MPI::COMM_WORLD.Get_rank())};
-  MPI::COMM_WORLD.Allreduce(MPI_IN_PLACE, valueAndRank.data(), 1, MPI::DOUBLE_INT, MPI::MINLOC);
+  MPI_Allreduce(MPI_IN_PLACE, valueAndRank.data(), 1, MPI_DOUBLE_INT, MPI_MINLOC, MPI_COMM_WORLD);
   broadcast_rank = static_cast<int>(valueAndRank[1]);
-  MPI::COMM_WORLD.Bcast(dPdF_min.data(), 81, MPI::DOUBLE, broadcast_rank);
+  MPI_Bcast(dPdF_min.data(), 81, MPI_DOUBLE, broadcast_rank, MPI_COMM_WORLD);
 
   C_minMaxAvg = 0.5 * (dPdF_max + dPdF_min);
   C_volAvg = homogenization_dPdF->sum(Eigen::array<int, 1>{4});
   
-  MPI::COMM_WORLD.Allreduce(MPI_IN_PLACE, C_volAvg.data(), 81, MPI::DOUBLE, MPI::SUM);
+  MPI_Allreduce(MPI_IN_PLACE, C_volAvg.data(), 81, MPI_DOUBLE, MPI_SUM, MPI_COMM_WORLD);
   C_volAvg = C_volAvg * wgt;
 
   return P;
