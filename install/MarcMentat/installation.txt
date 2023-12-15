@@ -1,0 +1,19 @@
+Install or uninstall DAMASK modifications to MSC Marc/Mentat.
+This is for the Linux64 version of Marc/Mentat.
+
+usage: MSC_modifications.py [-h] [--editor string] [--marc-root string] [--marc-version string] [--damask-root string]
+                               [command]
+
+where command is either 'install' or 'uninstall'
+
+Refer to https://damask.mpie.de/installation/source_code.html#msc-marc for complete installation instructions.
+
+Usually you will need to be root for this to work!
+
+See Marc and Mentat Release Guide for List of Build and Supported Platforms.
+
+The Intel Fortran compiler needs to be installed.
+
+1) Install Marc, Mentat, and Documentation as usual.
+   Run the test example including subroutines to confirm that the installation of both Marc/Mentat and the Intel Fortran Compiler is ok.
+2) Run the MSC_modifications.py script from this directory.

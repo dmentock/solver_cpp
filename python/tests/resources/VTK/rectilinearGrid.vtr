@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<VTKFile type="RectilinearGrid" version="0.1" byte_order="LittleEndian" header_type="UInt32" compressor="vtkZLibDataCompressor">
+  <RectilinearGrid WholeExtent="0 3 0 4 0 5">
+  <Piece Extent="0 3 0 4 0 5">
+    <PointData>
+      <DataArray type="Float32" Name="node" NumberOfComponents="3" format="binary" RangeMin="0" RangeMax="31.016124838541646">
+        AQAAAACAAACgBQAA+QAAAA==eF5tkoENwjAMBDsCG/XZzON1LJSIf58Dlaoc4mr7k1wXn7rBan69hxZvrWE1L/9fre2b1bx9te9+yw+rea2cqeAX/IJf8OMyh5rZn+541ey8514MT83Oe+7XqKVm5019+AW/4Bd8zhRWM/d4r0c+zs65zrMcLt7k/frMz//Myev68At+wS/46cH9RW/eo13/OMNzPp7D9gVf8DVnZ5+fs4TLd9eHH1az89r3N+N+aNYy75X3hnvKfjd8wTdrzmRej+cbd1FzbnPmRc/Uh2/283z9sJqd93H9u/2wmp03vuALvuCr/fXbfljNzpv68MNqdt7n/QEgMrwB
+        <InformationKey name="L2_NORM_RANGE" location="vtkDataArray" length="2">
+          <Value index="0">
+            0
+          </Value>
+          <Value index="1">
+            31.016124839
+          </Value>
+        </InformationKey>
+      </DataArray>
+    </PointData>
+    <CellData>
+      <DataArray type="Float32" Name="cell" NumberOfComponents="3" format="binary" RangeMin="0" RangeMax="18.788294228055936">
+        AQAAAACAAADQAgAAigAAAA==eF5tkQEOgDAIA32CP7L+bE83oMBVJVnWhGMt2bax1gEta3Uv7tb6n0mmtPyt/RymtUZXmQ/fe+Wwo/981pPnDt9iWmt0FWe403tn89NozlkfJyp9hTxCnodpjjtgPsr2Ob7vJiMw8OB/xF1Ma42uWsizkGchTzGtNToZgREYDZP+yFPMrS+Grlfp
+        <InformationKey name="L2_NORM_RANGE" location="vtkDataArray" length="2">
+          <Value index="0">
+            0
+          </Value>
+          <Value index="1">
+            18.788294228
+          </Value>
+        </InformationKey>
+      </DataArray>
+    </CellData>
+    <Coordinates>
+      <DataArray type="Float64" Name="x" format="binary" RangeMin="0" RangeMax="9">
+        AQAAAACAAAAgAAAAFQAAAA==eF5jYEAGH+whtIADhFZyAAAYkwHi
+      </DataArray>
+      <DataArray type="Float64" Name="y" format="binary" RangeMin="0" RangeMax="16">
+        AQAAAACAAAAoAAAAFwAAAA==eF5jYEAGH+whtIADhFaC0gYOAChDAlI=
+      </DataArray>
+      <DataArray type="Float64" Name="z" format="binary" RangeMin="0" RangeMax="25">
+        AQAAAACAAAAwAAAAGgAAAA==eF5jYEAGH+whtIADhFaC0gZQ2tIBADuFAss=
+      </DataArray>
+    </Coordinates>
+  </Piece>
+  </RectilinearGrid>
+</VTKFile>
